@@ -5,11 +5,12 @@
  */
 
 import type { StaticFinding } from "./static-analyzer";
+import type { FindingCategory } from "./types";
 
 export interface AIFinding {
   id: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
-  category: string;
+  category: FindingCategory;
   title: string;
   description: string;
   file: string;
