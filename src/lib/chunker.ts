@@ -1,105 +1,52 @@
 import type { CodeFile } from "./types";
-import { extractHighRiskCodeFromFiles, buildSmartContext, type ExtractedCode } from "./ast-extractor";
 
-const MAX_CHARS_PER_BATCH = 32_000; // Reduced since we're sending only risky code
-const MAX_SECTIONS_PER_BATCH = 20;
+const MAX_FILES_PER_BATCH = 12;
+const MAX_CHARS_PER_BATCH = 48_000;
+const MAX_FILE_CHARS = 12_000;
 
-export interface SmartBatch {
-  files: CodeFile[];
-  extractedCode: ExtractedCode[];
-  smartContext: string;
-  stats: {
-    totalLines: number;
-    extractedLines: number;
-    compressionRatio: number;
-  };
+export function trimFileContent(content: string): string {
+  if (content.length <= MAX_FILE_CHARS) return content;
+  const half = Math.floor(MAX_FILE_CHARS / 2);
+  return (
+    content.slice(0, half) +
+    "\n\n/* ... Vettcode truncated middle of large file ... */\n\n" +
+    content.slice(-half)
+  );
 }
 
-export function createSmartBatches(files: CodeFile[]): SmartBatch[] {
-  const batches: SmartBatch[] = [];
-  
-  // Extract high-risk code sections from all files
-  const extracted = extractHighRiskCodeFromFiles(
-    files.map((f) => ({ path: f.path, content: f.content }))
-  );
+export function createBatches(files: CodeFile[]): CodeFile[][] {
+  const batches: CodeFile[][] = [];
+  let current: CodeFile[] = [];
+  let currentChars = 0;
 
-  // Sort by total risk score (sum of all section risk scores)
-  const sortedExtracted = extracted.sort((a, b) => {
-    const scoreA = a.sections.reduce((sum, s) => sum + s.riskScore, 0);
-    const scoreB = b.sections.reduce((sum, s) => sum + s.riskScore, 0);
-    return scoreB - scoreA;
+  const sorted = [...files].sort((a, b) => {
+    const priority = (p: string) => {
+      if (p.includes("src/") || p.includes("app/") || p.includes("api/")) return 0;
+      if (p.includes("lib/") || p.includes("server/")) return 1;
+      if (p.endsWith(".env") || p.includes("config")) return 2;
+      return 3;
+    };
+    return priority(a.path) - priority(b.path) || a.path.localeCompare(b.path);
   });
 
-  let currentBatch: ExtractedCode[] = [];
-  let currentChars = 0;
-  let currentSections = 0;
-
-  for (const ext of sortedExtracted) {
-    const context = buildSmartContext([ext]);
-    const size = context.length;
-    const sections = ext.sections.length;
+  for (const file of sorted) {
+    const trimmed = trimFileContent(file.content);
+    const entry: CodeFile = { ...file, content: trimmed };
+    const size = trimmed.length + file.path.length;
 
     if (
-      (currentChars + size > MAX_CHARS_PER_BATCH && currentBatch.length > 0) ||
-      (currentSections + sections > MAX_SECTIONS_PER_BATCH && currentBatch.length > 0)
+      current.length >= MAX_FILES_PER_BATCH ||
+      (currentChars + size > MAX_CHARS_PER_BATCH && current.length > 0)
     ) {
-      // Finalize current batch
-      const batchFiles = currentBatch.map((e) => {
-        const original = files.find((f) => f.path === e.file);
-        return original || { path: e.file, content: "", lines: 0 };
-      });
-
-      const totalLines = currentBatch.reduce((sum, e) => sum + e.totalLines, 0);
-      const extractedLines = currentBatch.reduce((sum, e) => sum + e.extractedLines, 0);
-
-      batches.push({
-        files: batchFiles,
-        extractedCode: currentBatch,
-        smartContext: buildSmartContext(currentBatch),
-        stats: {
-          totalLines,
-          extractedLines,
-          compressionRatio: totalLines > 0 ? extractedLines / totalLines : 0,
-        },
-      });
-
-      currentBatch = [];
+      batches.push(current);
+      current = [];
       currentChars = 0;
-      currentSections = 0;
     }
 
-    currentBatch.push(ext);
+    current.push(entry);
     currentChars += size;
-    currentSections += sections;
   }
 
-  // Add remaining batch
-  if (currentBatch.length > 0) {
-    const batchFiles = currentBatch.map((e) => {
-      const original = files.find((f) => f.path === e.file);
-      return original || { path: e.file, content: "", lines: 0 };
-    });
-
-    const totalLines = currentBatch.reduce((sum, e) => sum + e.totalLines, 0);
-    const extractedLines = currentBatch.reduce((sum, e) => sum + e.extractedLines, 0);
-
-    batches.push({
-      files: batchFiles,
-      extractedCode: currentBatch,
-      smartContext: buildSmartContext(currentBatch),
-      stats: {
-        totalLines,
-        extractedLines,
-        compressionRatio: totalLines > 0 ? extractedLines / totalLines : 0,
-      },
-    });
-  }
-
+  if (current.length > 0) batches.push(current);
   return batches;
-}
-
-// Legacy function for backward compatibility
-export function createBatches(files: CodeFile[]): CodeFile[][] {
-  const smartBatches = createSmartBatches(files);
-  return smartBatches.map((b) => b.files);
 }
