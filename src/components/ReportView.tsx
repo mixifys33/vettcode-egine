@@ -234,6 +234,32 @@ export function ReportView({ report, warnings, onReset }: ReportViewProps) {
         >
           Download JSON report
         </button>
+        {report.metadata?.fileTree && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              const fileTreeData = {
+                projectName: report.metadata?.projectName || "unknown",
+                scannedAt: report.metadata?.scannedAt || new Date().toISOString(),
+                totalFiles: report.metadata?.filesScanned || 0,
+                totalLines: report.metadata?.linesScanned || 0,
+                fileTree: report.metadata.fileTree,
+              };
+              const blob = new Blob([JSON.stringify(fileTreeData, null, 2)], {
+                type: "application/json",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `file-tree-${report.metadata?.projectName || 'project'}-${Date.now()}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Download File Tree JSON
+          </button>
+        )}
       </div>
 
       {report.modelUsed && (
