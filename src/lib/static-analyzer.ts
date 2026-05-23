@@ -3,10 +3,12 @@
  * Runs BEFORE AI to catch obvious issues and reduce token usage
  */
 
+import type { FindingCategory } from "./types";
+
 export interface StaticFinding {
   id: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
-  category: string;
+  category: FindingCategory;
   title: string;
   description: string;
   file: string;
@@ -19,7 +21,7 @@ interface Pattern {
   id: string;
   regex: RegExp;
   severity: StaticFinding["severity"];
-  category: string;
+  category: FindingCategory;
   title: string;
   description: string;
   confidence: StaticFinding["confidence"];
