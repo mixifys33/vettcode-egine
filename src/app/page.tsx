@@ -112,11 +112,6 @@ export default function Home() {
               startScan(() => collectFromZip(file, projectName))
             }
           />
-
-          <p className="disclaimer">
-            API keys stay on the server (Vercel env vars). Uses up to 3 OpenRouter keys
-            in parallel for speed. Free models via OpenRouter — rate limits apply.
-          </p>
         </>
       )}
 
