@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/scan/batch/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/scan/synthesize/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

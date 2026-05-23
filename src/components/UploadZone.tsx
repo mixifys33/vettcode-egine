@@ -1,0 +1,111 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+
+interface UploadZoneProps {
+  disabled?: boolean;
+  onFolderSelect: (files: FileList) => void;
+  onZipSelect: (file: File) => void;
+}
+
+export function UploadZone({
+  disabled,
+  onFolderSelect,
+  onZipSelect,
+}: UploadZoneProps) {
+  const [active, setActive] = useState(false);
+  const folderRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setActive(false);
+      if (disabled) return;
+
+      const items = e.dataTransfer.items;
+      if (items?.length) {
+        for (const item of Array.from(items)) {
+          if (item.kind === "file") {
+            const file = item.getAsFile();
+            if (file?.name.endsWith(".zip")) {
+              onZipSelect(file);
+              return;
+            }
+          }
+        }
+      }
+
+      const files = e.dataTransfer.files;
+      if (files.length) {
+        const zip = Array.from(files).find((f) => f.name.endsWith(".zip"));
+        if (zip) onZipSelect(zip);
+      }
+    },
+    [disabled, onZipSelect]
+  );
+
+  return (
+    <div
+      className={`dropzone ${active ? "active" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setActive(true);
+      }}
+      onDragLeave={() => setActive(false)}
+      onDrop={onDrop}
+    >
+      <p style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+        Drop a project folder or ZIP archive
+      </p>
+      <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
+        node_modules, dist, .git, vendor, and other dependency/build paths are
+        automatically ignored
+      </p>
+
+      <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={disabled}
+          onClick={() => folderRef.current?.click()}
+        >
+          Select project folder
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={disabled}
+          onClick={() => zipRef.current?.click()}
+        >
+          Upload ZIP
+        </button>
+      </div>
+
+      <input
+        ref={folderRef}
+        type="file"
+        hidden
+        multiple
+        // @ts-expect-error webkitdirectory is non-standard but widely supported
+        webkitdirectory=""
+        onChange={(e) => {
+          const list = e.target.files;
+          if (list?.length) onFolderSelect(list);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={zipRef}
+        type="file"
+        hidden
+        accept=".zip,application/zip"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onZipSelect(file);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
