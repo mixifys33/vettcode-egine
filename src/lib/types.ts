@@ -50,12 +50,20 @@ export interface VettReport {
     reportConfidence?: number;
     reportConfidenceGrade?: string;
     reportConfidenceExplanation?: string;
+    fileTree?: FileTreeNode[];
   };
   // Legacy fields for backward compatibility
   scannedFiles?: number;
   scannedLines?: number;
   ignoredPaths?: number;
   modelUsed?: string;
+}
+
+export interface FileTreeNode {
+  name: string;
+  type: "file" | "folder";
+  path: string;
+  children?: FileTreeNode[];
 }
 
 export interface CodeFile {

@@ -7,7 +7,7 @@
 import { runStaticAnalysis, shouldSendToAI, type StaticFinding } from "./static-analyzer";
 import { extractHighRiskCode, shouldAnalyzeFile, type ExtractedCode } from "./ast-extractor";
 import { verifyFindings, deduplicateFindings, calculateReportConfidence, type AIFinding, type VerifiedFinding } from "./verification-layer";
-import type { CodeFile, VettReport } from "./types";
+import type { CodeFile, VettReport, FileTreeNode } from "./types";
 
 export interface ScanProgress {
   phase: string;
@@ -167,6 +167,7 @@ export async function runSmartScan(
       reportConfidence: reportConfidence.score,
       reportConfidenceGrade: reportConfidence.grade,
       reportConfidenceExplanation: reportConfidence.explanation,
+      fileTree: buildFileTree(files),
     },
   };
 
@@ -452,4 +453,66 @@ function generatePrevention(finding: StaticFinding): string {
   }
 
   return "Follow security and code quality best practices";
+}
+
+
+function buildFileTree(files: CodeFile[]): FileTreeNode[] {
+  const root: Map<string, FileTreeNode> = new Map();
+
+  for (const file of files) {
+    const parts = file.path.split("/").filter(Boolean);
+    let currentLevel = root;
+    let currentPath = "";
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isFile = i === parts.length - 1;
+
+      if (!currentLevel.has(part)) {
+        const node: FileTreeNode = {
+          name: part,
+          type: isFile ? "file" : "folder",
+          path: currentPath,
+        };
+
+        if (!isFile) {
+          node.children = [];
+        }
+
+        currentLevel.set(part, node);
+      }
+
+      if (!isFile) {
+        const folderNode = currentLevel.get(part)!;
+        if (!folderNode.children) {
+          folderNode.children = [];
+        }
+        // Create a map for the next level
+        const childMap = new Map<string, FileTreeNode>();
+        for (const child of folderNode.children) {
+          childMap.set(child.name, child);
+        }
+        currentLevel = childMap;
+      }
+    }
+  }
+
+  // Convert map to sorted array
+  const sortNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {
+    return nodes.sort((a, b) => {
+      // Folders first, then files
+      if (a.type !== b.type) {
+        return a.type === "folder" ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    }).map(node => {
+      if (node.children) {
+        node.children = sortNodes(node.children);
+      }
+      return node;
+    });
+  };
+
+  return sortNodes(Array.from(root.values()));
 }

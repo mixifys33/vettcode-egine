@@ -1,6 +1,43 @@
 "use client";
 
-import type { Finding, VettReport } from "@/lib/types";
+import type { Finding, VettReport, FileTreeNode } from "@/lib/types";
+import { useState } from "react";
+
+function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
+  const [isOpen, setIsOpen] = useState(level < 2); // Auto-expand first 2 levels
+
+  if (node.type === "file") {
+    return (
+      <div style={{ paddingLeft: `${level * 20}px`, fontSize: "0.85rem", color: "var(--muted)" }}>
+        📄 {node.name}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        style={{
+          paddingLeft: `${level * 20}px`,
+          fontSize: "0.85rem",
+          cursor: "pointer",
+          userSelect: "none",
+          color: "var(--text)",
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isOpen ? "📂" : "📁"} <strong>{node.name}</strong> ({node.children?.length || 0})
+      </div>
+      {isOpen && node.children && (
+        <div>
+          {node.children.map((child, i) => (
+            <FileTreeItem key={i} node={child} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function scoreColor(score: number): string {
   if (score >= 80) return "var(--accent)";
@@ -107,6 +144,20 @@ export function ReportView({ report, warnings, onReset }: ReportViewProps) {
           </div>
         )}
       </div>
+
+      {report.metadata?.fileTree && report.metadata.fileTree.length > 0 && (
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <h3 style={{ marginBottom: "0.75rem" }}>📁 Codebase Structure</h3>
+          <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: "1rem" }}>
+            Total folders and files in the scanned codebase
+          </p>
+          <div style={{ maxHeight: "400px", overflowY: "auto", padding: "0.5rem", background: "var(--surface2)", borderRadius: "8px" }}>
+            {report.metadata.fileTree.map((node, i) => (
+              <FileTreeItem key={i} node={node} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {report.criticalBlockers.length > 0 && (
         <div className="card" style={{ marginBottom: "1rem", borderColor: "var(--critical)" }}>
