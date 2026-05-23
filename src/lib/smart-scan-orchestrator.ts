@@ -229,7 +229,7 @@ function createSmartBatches(
   extractedSections: ExtractedCode[],
   staticFindings: StaticFinding[]
 ): SmartBatch[] {
-  const MAX_CHARS_PER_BATCH = 40_000; // Reduced from 48K
+  const MAX_CHARS_PER_BATCH = 20_000; // Reduced from 40K to prevent timeouts
   const batches: SmartBatch[] = [];
   
   let currentBatch: SmartBatch = { sections: [], staticFindings: [] };
@@ -275,25 +275,43 @@ async function analyzeBatchWithAI(
   batch: SmartBatch
 ): Promise<AIFinding[]> {
   
-  const res = await fetch("/api/scan/smart-batch", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      projectName,
-      batchIndex,
-      totalBatches,
-      batch,
-      keySlot: batchIndex,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (before Vercel's 60s)
+  
+  try {
+    const res = await fetch("/api/scan/smart-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectName,
+        batchIndex,
+        totalBatches,
+        batch,
+        keySlot: batchIndex,
+      }),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error ?? "AI analysis failed");
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(error.error ?? "AI analysis failed");
+    }
+
+    const data = await res.json();
+    return data.findings || [];
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn(`Batch ${batchIndex} timed out, skipping...`);
+      return []; // Return empty findings instead of failing entire scan
+    }
+    
+    console.error(`Batch ${batchIndex} failed:`, error);
+    return []; // Continue with other batches
   }
-
-  const data = await res.json();
-  return data.findings || [];
 }
 
 function calculateStrictScore(findings: VerifiedFinding[]): number {
