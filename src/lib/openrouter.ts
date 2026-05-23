@@ -24,10 +24,13 @@ export function getModels(): string[] {
   const raw =
     process.env.OPENROUTER_MODELS ??
     "openrouter/free,deepseek/deepseek-chat-v3-0324:free,qwen/qwen-2.5-coder-32b-instruct:free";
-  return raw
+  const models = raw
     .split(",")
     .map((m) => m.trim())
     .filter(Boolean);
+  
+  // OpenRouter allows max 3 models in fallback array
+  return models.slice(0, 3);
 }
 
 export function nextApiKey(): string {
