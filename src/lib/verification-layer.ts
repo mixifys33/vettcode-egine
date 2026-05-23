@@ -157,7 +157,7 @@ function verifyIndividualFinding(
   const categoryValidation = validateByCategory(aiFinding, file?.content);
   if (categoryValidation.isFalsePositive) {
     verificationStatus = "false-positive";
-    verificationNotes = categoryValidation.reason;
+    verificationNotes = categoryValidation.reason || "Marked as false positive";
     confidence = "low";
   } else if (categoryValidation.adjustConfidence) {
     confidence = categoryValidation.adjustConfidence;
