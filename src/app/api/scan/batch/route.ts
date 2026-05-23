@@ -7,9 +7,10 @@ import {
 } from "@/lib/openrouter";
 import {
   BATCH_SYSTEM_PROMPT,
-  buildBatchUserPrompt,
+  buildSmartBatchUserPrompt,
 } from "@/lib/prompts";
-import type { BatchAnalysisResult, CodeFile } from "@/lib/types";
+import type { BatchAnalysisResult } from "@/lib/types";
+import type { StaticFinding } from "@/lib/static-analyzer";
 
 export const maxDuration = 60;
 
@@ -27,33 +28,35 @@ export async function POST(req: NextRequest) {
       projectName,
       batchIndex,
       totalBatches,
-      files,
+      smartContext,
+      staticFindings,
       keySlot,
     } = body as {
       projectName: string;
       batchIndex: number;
       totalBatches: number;
-      files: CodeFile[];
-      keySlot?: number;
+      smartContext: string;
+      staticFindings: StaticFinding[];
+      keySlot: number;
     };
 
-    if (!files?.length) {
-      return NextResponse.json({ error: "No files in batch" }, { status: 400 });
+    if (!smartContext) {
+      return NextResponse.json({ error: "No context in batch" }, { status: 400 });
     }
 
-    const slot = keySlot ?? batchIndex;
-    const apiKey = keyForIndex(slot);
+    const apiKey = keyForIndex(keySlot);
 
     const { content, model } = await chatCompletion(
       [
         { role: "system", content: BATCH_SYSTEM_PROMPT },
         {
           role: "user",
-          content: buildBatchUserPrompt(
+          content: buildSmartBatchUserPrompt(
             projectName ?? "unknown",
             batchIndex ?? 0,
             totalBatches ?? 1,
-            files
+            smartContext,
+            staticFindings || []
           ),
         },
       ],

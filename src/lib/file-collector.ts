@@ -1,9 +1,9 @@
 import { shouldIgnorePath } from "./ignore-patterns";
 import type { CodeFile } from "./types";
 
-const MAX_FILES = 400;
-const MAX_FILE_BYTES = 150_000;
-const MAX_TOTAL_BYTES = 4_000_000;
+const MAX_FILES = 2000; // Increased from 400
+const MAX_FILE_BYTES = 500_000; // Increased from 150KB
+const MAX_TOTAL_BYTES = 20_000_000; // Increased to 20MB (we extract only risky code anyway)
 
 function countLines(text: string): number {
   if (!text) return 0;

@@ -5,7 +5,7 @@ import { UploadZone } from "@/components/UploadZone";
 import { ScanProgress } from "@/components/ScanProgress";
 import { ReportView } from "@/components/ReportView";
 import { collectFromFileList, collectFromZip } from "@/lib/file-collector";
-import { runFullScan } from "@/lib/scan-orchestrator";
+import { runSmartScan } from "@/lib/smart-scan-orchestrator";
 import type { VettReport } from "@/lib/types";
 
 export default function Home() {
@@ -42,7 +42,7 @@ export default function Home() {
         );
       }
 
-      const finalReport = await runFullScan(
+      const scanResult = await runSmartScan(
         projectName,
         result.files,
         result.ignoredCount,
@@ -53,7 +53,10 @@ export default function Home() {
         }
       );
 
-      setReport(finalReport);
+      setReport(scanResult.report);
+      
+      // Log stats for debugging
+      console.log("Scan stats:", scanResult.stats);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
     } finally {

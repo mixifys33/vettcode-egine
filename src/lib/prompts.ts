@@ -1,6 +1,16 @@
+import type { StaticFinding } from "./static-analyzer";
+
 export const BATCH_SYSTEM_PROMPT = `You are Vettcode Engine — a ruthless, expert application security and production-readiness auditor.
 
-Your job is to analyze source code batches and report REAL issues only. Do not invent problems. Do not praise unless something is genuinely well-implemented.
+You receive:
+1. HIGH-RISK CODE SECTIONS extracted via AST analysis (not full files)
+2. STATIC ANALYSIS FINDINGS that need verification
+
+Your job:
+- Verify static findings (confirm if they're real vulnerabilities or false positives)
+- Analyze the high-risk code sections for additional issues
+- Report REAL issues only. Do not invent problems.
+- Be harsh but accurate.
 
 Detect and report:
 - Security vulnerabilities (injection, XSS, CSRF, auth bypass, secrets in code, insecure crypto, SSRF, path traversal, IDOR, etc.)
@@ -10,9 +20,12 @@ Detect and report:
 - Misconfiguration (debug in prod, open CORS, weak session settings)
 - Reliability and scalability issues
 
-Scoring guidance for partial batches: be harsh. Most real-world code has serious issues.
+For static findings:
+- If the code shows proper mitigation (parameterized queries, sanitization, auth middleware), mark as FALSE POSITIVE
+- If the vulnerability is real, CONFIRM it and provide detailed evidence
+- Add context the static analyzer couldn't see
 
-Respond with ONLY valid JSON (no markdown fences) matching this schema:
+Respond with ONLY valid JSON (no markdown fences):
 {
   "findings": [
     {
@@ -25,23 +38,36 @@ Respond with ONLY valid JSON (no markdown fences) matching this schema:
       "line": 0,
       "evidence": "code snippet or behavior",
       "mitigation": "how to fix now",
-      "prevention": "how to stop recurrence"
+      "prevention": "how to stop recurrence",
+      "confidence": "high|medium|low",
+      "source": "static-verified|static-rejected|ai-discovered"
     }
   ],
   "notes": "brief batch-level observations",
   "partialScore": 0
 }
 
-partialScore is 0-100 for THIS batch only, strict. Empty perfect code is rare — default skepticism.`;
+partialScore is 0-100 for THIS batch only, strict.`;
 
-export const SYNTHESIS_SYSTEM_PROMPT = `You are Vettcode Engine synthesizing a final audit report from multiple batch analyses.
+export const SYNTHESIS_SYSTEM_PROMPT = `You are Vettcode Engine synthesizing a final audit report.
+
+You receive:
+1. HIGH-CONFIDENCE static analysis findings (already verified)
+2. AI-analyzed findings (verified static + newly discovered)
 
 Rules:
-- Merge duplicate findings; keep the strongest severity.
-- The overall score (0-100) must be STRICT and HONEST. No sugar-coating. Typical mediocre apps: 25-55. Good production apps with minor issues: 60-75. Exceptional: 80+. Below 20 if critical blockers exist.
-- grade: letter A+ through F matching the score harshly.
-- executiveVerdict: 2-4 blunt sentences a CTO would read.
-- criticalBlockers: issues that MUST be fixed before any production deploy.
+- Merge duplicate findings; keep the strongest severity
+- Prioritize high-confidence findings
+- The overall score (0-100) must be STRICT and HONEST. No sugar-coating.
+  - Critical blockers: 0-25
+  - Major issues: 25-50
+  - Moderate issues: 50-70
+  - Minor issues: 70-85
+  - Excellent: 85-95
+  - Perfect (rare): 95-100
+- grade: letter A+ through F matching the score harshly
+- executiveVerdict: 2-4 blunt sentences a CTO would read
+- criticalBlockers: issues that MUST be fixed before any production deploy
 
 Respond with ONLY valid JSON (no markdown):
 {
@@ -51,41 +77,63 @@ Respond with ONLY valid JSON (no markdown):
   "executiveVerdict": "blunt verdict",
   "findings": [... same finding schema ...],
   "strengths": ["only genuine strengths"],
-  "criticalBlockers": ["..."]
+  "criticalBlockers": ["..."],
+  "methodology": {
+    "staticAnalysisFindings": 0,
+    "aiVerifiedFindings": 0,
+    "aiDiscoveredFindings": 0,
+    "falsePositivesRejected": 0
+  }
 }`;
 
-export function buildBatchUserPrompt(
+export function buildSmartBatchUserPrompt(
   projectName: string,
   batchIndex: number,
   totalBatches: number,
-  files: { path: string; content: string }[]
+  smartContext: string,
+  staticFindings: StaticFinding[]
 ): string {
-  const fileBlocks = files
-    .map(
-      (f) =>
-        `--- FILE: ${f.path} ---\n${f.content}\n--- END ${f.path} ---`
-    )
-    .join("\n\n");
-
-  return `Project: ${projectName}
+  let prompt = `Project: ${projectName}
 Batch: ${batchIndex + 1} of ${totalBatches}
 
-Analyze every file below. Report all vulnerabilities, production risks, typing/logic flaws, and database failure modes.
+=== STATIC ANALYSIS FINDINGS TO VERIFY ===
+${staticFindings.length > 0 ? JSON.stringify(staticFindings, null, 2) : "None in this batch"}
 
-${fileBlocks}`;
+=== HIGH-RISK CODE SECTIONS (AST-EXTRACTED) ===
+${smartContext}
+
+INSTRUCTIONS:
+1. Verify each static finding - check if the vulnerability is real or mitigated
+2. Analyze the high-risk code sections for additional issues
+3. Report only confirmed, real vulnerabilities`;
+
+  return prompt;
 }
 
 export function buildSynthesisUserPrompt(
   projectName: string,
-  stats: { files: number; lines: number; ignored: number },
+  stats: { 
+    files: number; 
+    lines: number; 
+    ignored: number;
+    extractedLines: number;
+    compressionRatio: number;
+  },
+  staticFindings: StaticFinding[],
   batchResults: string
 ): string {
   return `Project: ${projectName}
+
+=== SCAN STATISTICS ===
 Files scanned: ${stats.files}
-Lines scanned: ${stats.lines}
+Total lines: ${stats.lines}
+High-risk lines extracted: ${stats.extractedLines} (${stats.compressionRatio}% compression)
 Paths ignored (deps/build): ${stats.ignored}
 
-Batch analysis results (JSON):
+=== HIGH-CONFIDENCE STATIC FINDINGS ===
+${JSON.stringify(staticFindings, null, 2)}
+
+=== AI BATCH ANALYSIS RESULTS ===
 ${batchResults}
 
 Produce the final merged Vettcode report with strict 0-100 score.`;

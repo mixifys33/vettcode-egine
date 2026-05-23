@@ -85,21 +85,27 @@ export function ReportView({ report, warnings, onReset }: ReportViewProps) {
 
       <div className="stats-grid">
         <div className="stat-box">
-          <div className="stat-value">{report.scannedFiles}</div>
+          <div className="stat-value">{report.metadata?.filesScanned ?? report.scannedFiles ?? 0}</div>
           <div className="stat-label">Files scanned</div>
         </div>
         <div className="stat-box">
-          <div className="stat-value">{report.scannedLines.toLocaleString()}</div>
+          <div className="stat-value">{(report.metadata?.linesScanned ?? report.scannedLines ?? 0).toLocaleString()}</div>
           <div className="stat-label">Lines analyzed</div>
         </div>
         <div className="stat-box">
-          <div className="stat-value">{report.ignoredPaths}</div>
+          <div className="stat-value">{report.metadata?.ignoredPaths ?? report.ignoredPaths ?? 0}</div>
           <div className="stat-label">Paths ignored</div>
         </div>
         <div className="stat-box">
           <div className="stat-value">{sorted.length}</div>
           <div className="stat-label">Findings</div>
         </div>
+        {report.metadata?.reportConfidence && (
+          <div className="stat-box">
+            <div className="stat-value">{report.metadata.reportConfidence}%</div>
+            <div className="stat-label">Report confidence</div>
+          </div>
+        )}
       </div>
 
       {report.criticalBlockers.length > 0 && (

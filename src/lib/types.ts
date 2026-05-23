@@ -9,6 +9,8 @@ export type FindingCategory =
   | "performance"
   | "reliability"
   | "configuration"
+  | "code-quality"
+  | "react"
   | "other";
 
 export interface Finding {
@@ -39,9 +41,20 @@ export interface VettReport {
   findings: Finding[];
   strengths: string[];
   criticalBlockers: string[];
-  scannedFiles: number;
-  scannedLines: number;
-  ignoredPaths: number;
+  metadata?: {
+    projectName: string;
+    scannedAt: string;
+    filesScanned: number;
+    linesScanned: number;
+    ignoredPaths: number;
+    reportConfidence?: number;
+    reportConfidenceGrade?: string;
+    reportConfidenceExplanation?: string;
+  };
+  // Legacy fields for backward compatibility
+  scannedFiles?: number;
+  scannedLines?: number;
+  ignoredPaths?: number;
   modelUsed?: string;
 }
 
