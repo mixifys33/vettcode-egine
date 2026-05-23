@@ -10,7 +10,7 @@ function countLines(text: string): number {
   return text.split(/\r\n|\r|\n/).length;
 }
 
-function isLikelyBinary(buffer: ArrayBuffer): boolean {
+function isLikelyBinary(buffer: ArrayBuffer | SharedArrayBuffer): boolean {
   const view = new Uint8Array(buffer.slice(0, 512));
   let nulls = 0;
   for (const b of view) {
