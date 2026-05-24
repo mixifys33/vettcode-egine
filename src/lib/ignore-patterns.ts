@@ -53,6 +53,11 @@ export const IGNORED_FILE_NAMES = new Set([
   "composer.lock",
   "Gemfile.lock",
   "poetry.lock",
+  "README.md",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "LICENSE.md",
+  "CODE_OF_CONDUCT.md",
 ]);
 
 export const IGNORED_EXTENSIONS = new Set([
@@ -90,6 +95,8 @@ export const IGNORED_EXTENSIONS = new Set([
   ".jar",
   ".o",
   ".a",
+  ".md",      // Markdown files - documentation only
+  ".mdx",     // MDX files - documentation only
 ]);
 
 export const TEXT_EXTENSIONS = new Set([
@@ -137,8 +144,6 @@ export const TEXT_EXTENSIONS = new Set([
   ".scss",
   ".sass",
   ".less",
-  ".md",
-  ".mdx",
   ".env.example",
   ".prisma",
   ".proto",
