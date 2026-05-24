@@ -13,7 +13,7 @@ function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number 
         className="file-tree-item"
         style={{ paddingLeft: `${level * 16}px` }}
       >
-        {node.name}
+        📄 {node.name}
       </div>
     );
   }
@@ -30,7 +30,7 @@ function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number 
           if (e.key === "Enter" || e.key === " ") setIsOpen(!isOpen);
         }}
       >
-        {isOpen ? "▾" : "▸"} {node.name}
+        {isOpen ? "📂" : "📁"} {node.name}
         {node.children?.length ? ` (${node.children.length})` : ""}
       </div>
       {isOpen &&
@@ -41,6 +41,23 @@ function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number 
   );
 }
 
+// Helper to build flat file tree for JSON export
+function buildFlatFileTree(nodes: FileTreeNode[], prefix = ""): string[] {
+  const result: string[] = [];
+  nodes.forEach((node, index) => {
+    const isLast = index === nodes.length - 1;
+    const connector = isLast ? "└── " : "├── ";
+    const childPrefix = isLast ? "    " : "│   ";
+    
+    result.push(prefix + connector + node.name);
+    
+    if (node.type === "folder" && node.children) {
+      result.push(...buildFlatFileTree(node.children, prefix + childPrefix));
+    }
+  });
+  return result;
+}
+
 function scoreColor(score: number): string {
   if (score >= 80) return "var(--accent)";
   if (score >= 60) return "#a8e06a";
@@ -48,35 +65,66 @@ function scoreColor(score: number): string {
   return "var(--danger)";
 }
 
-function FindingItem({ f }: { f: Finding }) {
+function FindingItem({ f, isExpanded, onToggle }: { f: Finding; isExpanded: boolean; onToggle: () => void }) {
   return (
     <article className={`finding-card severity-${f.severity}`}>
       <div className="finding-meta">
         <span className={`badge badge-${f.severity}`}>{f.severity}</span>
         <span className="badge badge-info">{f.category}</span>
         {f.file && (
-          <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--muted)", wordBreak: "break-all" }}>
             {f.file}
             {f.line ? `:${f.line}` : ""}
           </span>
         )}
       </div>
       <h3 className="finding-title">{f.title}</h3>
-      <p style={{ fontSize: "0.9rem", color: "var(--muted)" }}>{f.description}</p>
-      {f.evidence && (
-        <div className="finding-section">
-          <strong>Evidence</strong>
-          <pre className="evidence">{f.evidence}</pre>
-        </div>
+      <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginBottom: "0.75rem" }}>{f.description}</p>
+      
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          padding: "0.5rem 1rem",
+          fontSize: "0.85rem",
+          background: "transparent",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          color: "var(--primary)",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          marginBottom: isExpanded ? "0.75rem" : "0"
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--bg-secondary)";
+          e.currentTarget.style.borderColor = "var(--primary)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.borderColor = "var(--border)";
+        }}
+      >
+        {isExpanded ? "Hide Details ▲" : "Show Details ▼"}
+      </button>
+      
+      {isExpanded && (
+        <>
+          {f.evidence && (
+            <div className="finding-section">
+              <strong>Evidence</strong>
+              <pre className="evidence">{f.evidence}</pre>
+            </div>
+          )}
+          <div className="finding-section">
+            <strong>Mitigation</strong>
+            <p>{f.mitigation}</p>
+          </div>
+          <div className="finding-section">
+            <strong>Prevention</strong>
+            <p>{f.prevention}</p>
+          </div>
+        </>
       )}
-      <div className="finding-section">
-        <strong>Mitigation</strong>
-        <p>{f.mitigation}</p>
-      </div>
-      <div className="finding-section">
-        <strong>Prevention</strong>
-        <p>{f.prevention}</p>
-      </div>
     </article>
   );
 }
@@ -97,6 +145,8 @@ export function ReportView({
   const [showAllBlockers, setShowAllBlockers] = useState(false);
   const [showAllStrengths, setShowAllStrengths] = useState(false);
   const [showAllFindings, setShowAllFindings] = useState(false);
+  const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
+  const [showFileTree, setShowFileTree] = useState(false);
   
   const sorted = [...report.findings].sort((a, b) => {
     const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -136,11 +186,24 @@ export function ReportView({
     });
   };
   
+  // Toggle finding expansion
+  const toggleFinding = (id: string) => {
+    setExpandedFindings(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+  
   // Filter findings by selected severities
   const filteredFindings = sorted.filter(f => selectedSeverities.includes(f.severity));
   
   // Limit critical blockers display
-  const BLOCKERS_PREVIEW_LIMIT = 5;
+  const BLOCKERS_PREVIEW_LIMIT = 3;
   const hasMoreBlockers = report.criticalBlockers.length > BLOCKERS_PREVIEW_LIMIT;
   const displayedBlockers = showAllBlockers 
     ? report.criticalBlockers 
@@ -159,6 +222,22 @@ export function ReportView({
   const displayedFindings = showAllFindings
     ? filteredFindings
     : filteredFindings.slice(0, FINDINGS_PREVIEW_LIMIT);
+  
+  // Download file tree as JSON
+  const downloadFileTree = () => {
+    if (!report.metadata?.fileTree) return;
+    
+    const treeLines = buildFlatFileTree(report.metadata.fileTree);
+    const treeText = treeLines.join('\n');
+    
+    const blob = new Blob([treeText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vettcode-file-tree-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
@@ -231,54 +310,218 @@ export function ReportView({
 
       {report.metadata?.fileTree && report.metadata.fileTree.length > 0 && (
         <div className="card" style={{ marginTop: "1rem" }}>
-          <h3 className="section-heading">Structure</h3>
-          <div className="file-tree">
-            {report.metadata.fileTree.map((node, i) => (
-              <FileTreeItem key={i} node={node} />
-            ))}
+          <div style={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            marginBottom: "0.75rem",
+            flexWrap: "wrap",
+            gap: "0.5rem"
+          }}>
+            <h3 className="section-heading" style={{ margin: 0 }}>
+              📁 Project Structure
+            </h3>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setShowFileTree(!showFileTree)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  fontSize: "0.85rem",
+                  background: showFileTree ? "var(--primary)" : "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  color: showFileTree ? "#fff" : "var(--text)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {showFileTree ? "Hide Tree" : "Show Tree"}
+              </button>
+              <button
+                type="button"
+                onClick={downloadFileTree}
+                style={{
+                  padding: "0.5rem 1rem",
+                  fontSize: "0.85rem",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-secondary)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "var(--border)";
+                }}
+              >
+                📥 Download Tree
+              </button>
+            </div>
           </div>
+          {showFileTree && (
+            <div className="file-tree">
+              {report.metadata.fileTree.map((node, i) => (
+                <FileTreeItem key={i} node={node} />
+              ))}
+            </div>
+          )}
+          {!showFileTree && (
+            <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+              Click "Show Tree" to view the complete folder structure, or download it as a text file.
+            </p>
+          )}
         </div>
       )}
 
       {report.criticalBlockers.length > 0 && (
-        <div className="card alert-card" style={{ marginTop: "1rem" }}>
-          <h3>Critical blockers ({report.criticalBlockers.length})</h3>
-          <ul style={{ paddingLeft: "1.2rem", fontSize: "0.9rem" }}>
-            {displayedBlockers.map((b, i) => (
-              <li key={i} style={{ marginBottom: "0.3rem" }}>
-                {b}
-              </li>
-            ))}
-          </ul>
+        <div style={{ 
+          marginTop: "1rem",
+          background: "linear-gradient(135deg, rgba(244, 63, 94, 0.1), rgba(251, 113, 133, 0.05))",
+          border: "2px solid var(--danger)",
+          borderRadius: "12px",
+          padding: "1.5rem",
+          position: "relative",
+          overflow: "hidden"
+        }}>
+          {/* Decorative corner accent */}
+          <div style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: "100px",
+            height: "100px",
+            background: "radial-gradient(circle at top right, rgba(244, 63, 94, 0.2), transparent)",
+            pointerEvents: "none"
+          }} />
+          
+          <div style={{ 
+            display: "flex", 
+            alignItems: "flex-start", 
+            gap: "1rem",
+            marginBottom: "1rem",
+            flexWrap: "wrap"
+          }}>
+            <div style={{
+              fontSize: "2.5rem",
+              lineHeight: 1,
+              flexShrink: 0
+            }}>
+              🚨
+            </div>
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <h3 style={{ 
+                color: "var(--danger)", 
+                fontSize: "1.25rem", 
+                fontWeight: 700,
+                marginBottom: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap"
+              }}>
+                Critical Blockers
+                <span style={{
+                  background: "var(--danger)",
+                  color: "#fff",
+                  padding: "0.25rem 0.75rem",
+                  borderRadius: "999px",
+                  fontSize: "0.85rem",
+                  fontWeight: 600
+                }}>
+                  {report.criticalBlockers.length}
+                </span>
+              </h3>
+              <p style={{ 
+                fontSize: "0.9rem", 
+                color: "var(--muted)",
+                marginBottom: "1rem"
+              }}>
+                These issues must be fixed before production deployment. They represent serious security vulnerabilities or critical bugs.
+              </p>
+            </div>
+          </div>
+          
+          <div style={{
+            background: "rgba(0, 0, 0, 0.3)",
+            borderRadius: "8px",
+            padding: "1rem",
+            border: "1px solid rgba(244, 63, 94, 0.3)"
+          }}>
+            <ul style={{ 
+              paddingLeft: "1.5rem", 
+              fontSize: "0.95rem",
+              lineHeight: "1.8",
+              margin: 0
+            }}>
+              {displayedBlockers.map((b, i) => (
+                <li key={i} style={{ 
+                  marginBottom: "0.75rem",
+                  color: "var(--text)",
+                  position: "relative"
+                }}>
+                  <span style={{
+                    position: "absolute",
+                    left: "-1.5rem",
+                    color: "var(--danger)",
+                    fontWeight: "bold"
+                  }}>
+                    ⚠
+                  </span>
+                  {b}
+                </li>
+              ))}
+            </ul>
+          </div>
+          
           {hasMoreBlockers && (
             <button
               type="button"
               onClick={() => setShowAllBlockers(!showAllBlockers)}
               style={{
-                marginTop: "0.75rem",
-                padding: "0.5rem 1rem",
-                fontSize: "0.85rem",
-                background: "transparent",
-                border: "1px solid var(--border)",
-                borderRadius: "6px",
-                color: "var(--text)",
+                marginTop: "1rem",
+                padding: "0.75rem 1.5rem",
+                fontSize: "0.9rem",
+                background: "var(--danger)",
+                border: "none",
+                borderRadius: "8px",
+                color: "#fff",
                 cursor: "pointer",
+                fontWeight: 600,
                 transition: "all 0.2s ease",
+                width: "100%"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-secondary)";
-                e.currentTarget.style.borderColor = "var(--accent)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(244, 63, 94, 0.4)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               {showAllBlockers 
-                ? "Show less" 
-                : `Show ${report.criticalBlockers.length - BLOCKERS_PREVIEW_LIMIT} more`}
+                ? "Show Less ▲" 
+                : `⚠ Show ${report.criticalBlockers.length - BLOCKERS_PREVIEW_LIMIT} More Critical Issues`}
             </button>
           )}
+          
+          <div style={{
+            marginTop: "1rem",
+            padding: "0.75rem 1rem",
+            background: "rgba(0, 0, 0, 0.2)",
+            borderRadius: "6px",
+            fontSize: "0.85rem",
+            color: "var(--muted)",
+            borderLeft: "3px solid var(--warning)"
+          }}>
+            💡 <strong style={{ color: "var(--warning)" }}>Pro Tip:</strong> Fix these issues first to dramatically improve your security score. Each critical blocker can reduce your score by 10-15 points.
+          </div>
         </div>
       )}
 
@@ -446,7 +689,14 @@ export function ReportView({
         </p>
       ) : (
         <>
-          {displayedFindings.map((f) => <FindingItem key={f.id} f={f} />)}
+          {displayedFindings.map((f) => (
+            <FindingItem 
+              key={f.id} 
+              f={f} 
+              isExpanded={expandedFindings.has(f.id)}
+              onToggle={() => toggleFinding(f.id)}
+            />
+          ))}
           {hasMoreFindings && (
             <button
               type="button"

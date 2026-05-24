@@ -5,6 +5,7 @@ import { UploadZone } from "@/components/UploadZone";
 import { ScanProgress } from "@/components/ScanProgress";
 import { ReportView } from "@/components/ReportView";
 import { AuthModal } from "@/components/AuthModal";
+import { ReportsHistory } from "@/components/ReportsHistory";
 import { collectFromFileList, collectFromZip } from "@/lib/file-collector";
 import { collectFromRemoteUrl } from "@/lib/collect-from-remote";
 import { RepoUrlInput } from "@/components/RepoUrlInput";
@@ -16,6 +17,7 @@ import {
   getAuthUser,
   clearAuth,
 } from "@/lib/auth";
+import { saveReport, type SavedReport } from "@/lib/report-storage";
 import type { VettReport } from "@/lib/types";
 
 function PrivacyBanner() {
@@ -55,6 +57,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState(getAuthUser());
+  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
 
   useEffect(() => {
     setUser(getAuthUser());
@@ -112,7 +115,15 @@ export default function Home() {
 
       setReport(scanResult.report);
 
-      if (!isAuthenticated()) {
+      // Save report for authenticated users
+      if (isAuthenticated()) {
+        try {
+          const saved = saveReport(projectName, scanResult.report, scanMode);
+          setCurrentReportId(saved.id);
+        } catch (error) {
+          console.error("Failed to save report:", error);
+        }
+      } else {
         incrementScanCount();
       }
     } catch (e) {
@@ -123,10 +134,34 @@ export default function Home() {
     }
   }
 
+  function handleSelectReport(savedReport: SavedReport) {
+    setReport(savedReport.report);
+    setProjectName(savedReport.projectName);
+    setLastScanMode(savedReport.scanMode);
+    setCurrentReportId(savedReport.id);
+    setWarnings([]);
+    setError(null);
+  }
+
+  function handleResetScan() {
+    setReport(null);
+    setCurrentReportId(null);
+    setWarnings([]);
+    setError(null);
+  }
+
   const scanQuota = canScan();
 
   return (
-    <main className="container">
+    <main className="container" style={{ paddingLeft: isAuthenticated() ? "340px" : "0" }}>
+      {/* Reports History Sidebar */}
+      {isAuthenticated() && (
+        <ReportsHistory
+          currentReportId={currentReportId}
+          onSelectReport={handleSelectReport}
+        />
+      )}
+
       <header className="site-header">
         <a href="/" className="brand">
           <span className="brand-mark">V</span>
@@ -303,11 +338,7 @@ export default function Home() {
           report={report}
           warnings={warnings}
           scanMode={lastScanMode}
-          onReset={() => {
-            setReport(null);
-            setError(null);
-            setWarnings([]);
-          }}
+          onReset={handleResetScan}
         />
       )}
 
