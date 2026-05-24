@@ -94,6 +94,10 @@ export function ReportView({
   scanMode = "quick",
   onReset,
 }: ReportViewProps) {
+  const [showAllBlockers, setShowAllBlockers] = useState(false);
+  const [showAllStrengths, setShowAllStrengths] = useState(false);
+  const [showAllFindings, setShowAllFindings] = useState(false);
+  
   const sorted = [...report.findings].sort((a, b) => {
     const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
     return order[a.severity] - order[b.severity];
@@ -106,6 +110,27 @@ export function ReportView({
     },
     {} as Record<string, number>
   );
+  
+  // Limit critical blockers display
+  const BLOCKERS_PREVIEW_LIMIT = 5;
+  const hasMoreBlockers = report.criticalBlockers.length > BLOCKERS_PREVIEW_LIMIT;
+  const displayedBlockers = showAllBlockers 
+    ? report.criticalBlockers 
+    : report.criticalBlockers.slice(0, BLOCKERS_PREVIEW_LIMIT);
+  
+  // Limit strengths display
+  const STRENGTHS_PREVIEW_LIMIT = 5;
+  const hasMoreStrengths = report.strengths.length > STRENGTHS_PREVIEW_LIMIT;
+  const displayedStrengths = showAllStrengths
+    ? report.strengths
+    : report.strengths.slice(0, STRENGTHS_PREVIEW_LIMIT);
+  
+  // Limit findings display
+  const FINDINGS_PREVIEW_LIMIT = 10;
+  const hasMoreFindings = sorted.length > FINDINGS_PREVIEW_LIMIT;
+  const displayedFindings = showAllFindings
+    ? sorted
+    : sorted.slice(0, FINDINGS_PREVIEW_LIMIT);
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
@@ -189,14 +214,43 @@ export function ReportView({
 
       {report.criticalBlockers.length > 0 && (
         <div className="card alert-card" style={{ marginTop: "1rem" }}>
-          <h3>Critical blockers</h3>
+          <h3>Critical blockers ({report.criticalBlockers.length})</h3>
           <ul style={{ paddingLeft: "1.2rem", fontSize: "0.9rem" }}>
-            {report.criticalBlockers.map((b, i) => (
+            {displayedBlockers.map((b, i) => (
               <li key={i} style={{ marginBottom: "0.3rem" }}>
                 {b}
               </li>
             ))}
           </ul>
+          {hasMoreBlockers && (
+            <button
+              type="button"
+              onClick={() => setShowAllBlockers(!showAllBlockers)}
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.5rem 1rem",
+                fontSize: "0.85rem",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                color: "var(--text)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--accent)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+            >
+              {showAllBlockers 
+                ? "Show less" 
+                : `Show ${report.criticalBlockers.length - BLOCKERS_PREVIEW_LIMIT} more`}
+            </button>
+          )}
         </div>
       )}
 
@@ -230,7 +284,7 @@ export function ReportView({
 
       {report.strengths.length > 0 && (
         <div className="card" style={{ marginBottom: "1rem" }}>
-          <h3 className="section-heading">Strengths</h3>
+          <h3 className="section-heading">Strengths ({report.strengths.length})</h3>
           <ul
             style={{
               paddingLeft: "1.2rem",
@@ -238,15 +292,44 @@ export function ReportView({
               fontSize: "0.9rem",
             }}
           >
-            {report.strengths.map((s, i) => (
+            {displayedStrengths.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ul>
+          {hasMoreStrengths && (
+            <button
+              type="button"
+              onClick={() => setShowAllStrengths(!showAllStrengths)}
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.5rem 1rem",
+                fontSize: "0.85rem",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                color: "var(--text)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--accent)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+            >
+              {showAllStrengths 
+                ? "Show less" 
+                : `Show ${report.strengths.length - STRENGTHS_PREVIEW_LIMIT} more`}
+            </button>
+          )}
         </div>
       )}
 
       <h2 className="section-heading" style={{ marginBottom: "0.75rem" }}>
-        Findings
+        Findings ({sorted.length})
       </h2>
       {sorted.length === 0 ? (
         <p className="card" style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
@@ -254,7 +337,24 @@ export function ReportView({
           production — automated scans can miss context-specific risks.
         </p>
       ) : (
-        sorted.map((f) => <FindingItem key={f.id} f={f} />)
+        <>
+          {displayedFindings.map((f) => <FindingItem key={f.id} f={f} />)}
+          {hasMoreFindings && (
+            <button
+              type="button"
+              onClick={() => setShowAllFindings(!showAllFindings)}
+              className="btn btn-ghost"
+              style={{
+                marginTop: "1rem",
+                width: "100%",
+              }}
+            >
+              {showAllFindings 
+                ? "Show less findings" 
+                : `Show ${sorted.length - FINDINGS_PREVIEW_LIMIT} more findings`}
+            </button>
+          )}
+        </>
       )}
 
       <div
