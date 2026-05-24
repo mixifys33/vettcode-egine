@@ -119,10 +119,12 @@ function verifyIndividualFinding(
       confidence = "low";
     } else {
       // Check if evidence matches actual code
-      const evidenceNormalized = aiFinding.evidence.trim().replace(/\s+/g, " ");
+      // Ensure evidence is a string before calling trim()
+      const evidenceStr = typeof aiFinding.evidence === 'string' ? aiFinding.evidence : String(aiFinding.evidence || '');
+      const evidenceNormalized = evidenceStr.trim().replace(/\s+/g, " ");
       const lineNormalized = targetLine.trim().replace(/\s+/g, " ");
       
-      if (lineNormalized.includes(evidenceNormalized) || evidenceNormalized.includes(lineNormalized)) {
+      if (evidenceNormalized && (lineNormalized.includes(evidenceNormalized) || evidenceNormalized.includes(lineNormalized))) {
         sources.push("pattern-match");
         if (verificationStatus === "likely") {
           verificationStatus = "confirmed";

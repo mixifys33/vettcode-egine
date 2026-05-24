@@ -339,7 +339,7 @@ async function analyzeBatchWithAI(
 ): Promise<AIFinding[]> {
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 52000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000); // Increased to 90 seconds
   
   try {
     const res = await fetch("/api/scan/smart-batch", {
@@ -373,13 +373,20 @@ async function analyzeBatchWithAI(
     }
 
     const data = await res.json();
-    return data.findings || [];
+    
+    // Validate that findings have proper evidence field
+    const findings = (data.findings || []).map((f: any) => ({
+      ...f,
+      evidence: typeof f.evidence === 'string' ? f.evidence : String(f.evidence || ''),
+    }));
+    
+    return findings;
   } catch (error) {
     clearTimeout(timeoutId);
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        console.warn(`Batch ${batchIndex} timed out, skipping...`);
+        console.warn(`Batch ${batchIndex} timed out after 90s, skipping...`);
       } else {
         console.error(`Batch ${batchIndex} failed:`, error.message);
       }

@@ -4,7 +4,7 @@ import type { ExtractedCode } from "@/lib/ast-extractor";
 import type { StaticFinding } from "@/lib/static-analyzer";
 import type { AIFinding } from "@/lib/verification-layer";
 
-export const maxDuration = 60; // Vercel max for Hobby/Pro plan
+export const maxDuration = 60; // Vercel max for Hobby/Pro plan (increased for large codebases)
 export const dynamic = 'force-dynamic'; // Prevent caching
 
 const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an expert security auditor and code quality analyst.
@@ -116,13 +116,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Validate findings structure
+    // Validate and sanitize findings structure
     const validFindings = (parsed.findings || []).filter(f => 
       f && 
       typeof f.id === 'string' && 
       typeof f.title === 'string' && 
       typeof f.file === 'string'
-    );
+    ).map(f => ({
+      ...f,
+      // Ensure evidence is always a string
+      evidence: typeof f.evidence === 'string' ? f.evidence : String(f.evidence || ''),
+      // Ensure all required string fields are strings
+      description: typeof f.description === 'string' ? f.description : String(f.description || ''),
+      mitigation: typeof f.mitigation === 'string' ? f.mitigation : String(f.mitigation || ''),
+      prevention: typeof f.prevention === 'string' ? f.prevention : String(f.prevention || ''),
+    }));
 
     return NextResponse.json({
       findings: validFindings,
