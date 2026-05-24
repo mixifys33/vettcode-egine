@@ -41,6 +41,16 @@ export const IGNORED_DIR_NAMES = new Set([
   ".stack-work",
   "zig-cache",
   "zig-out",
+  "test",           // Test directories
+  "tests",          // Test directories
+  "__tests__",      // Jest test directories
+  "spec",           // Spec directories
+  "specs",          // Spec directories
+  "e2e",            // End-to-end test directories
+  "cypress",        // Cypress test directories
+  "playwright",     // Playwright test directories
+  ".jest",          // Jest config directories
+  ".mocha",         // Mocha config directories
 ]);
 
 export const IGNORED_FILE_NAMES = new Set([
@@ -172,6 +182,23 @@ export function shouldIgnorePath(relativePath: string): boolean {
 
   const fileName = parts[parts.length - 1] ?? "";
   if (IGNORED_FILE_NAMES.has(fileName)) return true;
+
+  // Ignore test files by pattern
+  const testPatterns = [
+    /\.test\.(ts|tsx|js|jsx)$/,      // file.test.ts
+    /\.spec\.(ts|tsx|js|jsx)$/,      // file.spec.ts
+    /\.test\.(py|rb|go|java|php)$/,  // file.test.py
+    /\.spec\.(py|rb|go|java|php)$/,  // file.spec.py
+    /_test\.(ts|tsx|js|jsx|py|go)$/, // file_test.go
+    /_spec\.(ts|tsx|js|jsx|py|rb)$/, // file_spec.rb
+    /test_.*\.(py|rb)$/,              // test_file.py
+    /.*\.e2e\.(ts|tsx|js|jsx)$/,     // file.e2e.ts
+    /.*\.integration\.(ts|tsx|js|jsx)$/, // file.integration.ts
+  ];
+  
+  for (const pattern of testPatterns) {
+    if (pattern.test(fileName)) return true;
+  }
 
   const dot = fileName.lastIndexOf(".");
   const ext = dot >= 0 ? fileName.slice(dot).toLowerCase() : "";
