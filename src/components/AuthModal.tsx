@@ -105,25 +105,15 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           throw new Error(registerData.message || registerData.error || "Registration failed");
         }
 
-        // Auto-verify the seller (skip OTP for Google users)
-        const verifyRes = await fetch(`${BACKEND_URL}/api/sellers/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: googleEmail.toLowerCase(),
-            otp: "GOOGLE_AUTO_VERIFY", // Special code for Google users
-          }),
-        });
-
-        if (verifyRes.ok) {
-          const verifyData = await verifyRes.json();
-          
-          const token = `vettcode_${verifyData.seller.id}_${Date.now()}`;
+        // Check if account was created directly (Google OAuth users skip OTP)
+        if (registerData.seller && registerData.seller.id) {
+          // Account created directly - login immediately
+          const token = `vettcode_${registerData.seller.id}_${Date.now()}`;
           
           setAuthUser({
-            id: verifyData.seller.id,
-            name: verifyData.seller.name,
-            email: verifyData.seller.email,
+            id: registerData.seller.id,
+            name: registerData.seller.name,
+            email: registerData.seller.email,
             token,
             userType: "Seller",
           });
@@ -131,25 +121,25 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           resetScanCount();
           onSuccess();
         } else {
-          // If verify fails, just login with the credentials
-          const loginRetryRes = await fetch(`${BACKEND_URL}/api/sellers/login`, {
+          // Old flow - needs OTP verification (shouldn't happen for Google users)
+          const verifyRes = await fetch(`${BACKEND_URL}/api/sellers/verify`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: googleEmail.toLowerCase(),
-              password: `google_${payload.sub}`,
+              otp: "GOOGLE_AUTO_VERIFY",
             }),
           });
 
-          if (loginRetryRes.ok) {
-            const loginData = await loginRetryRes.json();
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
             
-            const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
+            const token = `vettcode_${verifyData.seller.id}_${Date.now()}`;
             
             setAuthUser({
-              id: loginData.seller.id,
-              name: loginData.seller.name,
-              email: loginData.seller.email,
+              id: verifyData.seller.id,
+              name: verifyData.seller.name,
+              email: verifyData.seller.email,
               token,
               userType: "Seller",
             });
@@ -157,7 +147,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             resetScanCount();
             onSuccess();
           } else {
-            throw new Error("Failed to complete Google authentication");
+            throw new Error("Failed to verify Google account");
           }
         }
       }
