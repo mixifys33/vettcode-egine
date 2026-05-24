@@ -28,10 +28,142 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      // Redirect to backend Google OAuth endpoint
-      window.location.href = `${BACKEND_URL}/api/sellers/auth/google`;
+      // Use Google Sign-In with popup
+      const google = (window as any).google;
+      
+      if (!google) {
+        throw new Error("Google Sign-In not loaded. Please refresh the page.");
+      }
+
+      // Initialize Google Sign-In
+      google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        callback: handleGoogleCallback,
+      });
+
+      // Prompt the user to select a Google account
+      google.accounts.id.prompt();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google login failed");
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleCallback(response: any) {
+    try {
+      // Decode the JWT token from Google
+      const credential = response.credential;
+      const payload = JSON.parse(atob(credential.split('.')[1]));
+      
+      const googleEmail = payload.email;
+      const googleName = payload.name;
+      
+      // Check if seller already exists (try to login first)
+      const loginRes = await fetch(`${BACKEND_URL}/api/sellers/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: googleEmail.toLowerCase(),
+          password: `google_${payload.sub}`, // Use Google ID as password
+        }),
+      });
+
+      if (loginRes.ok) {
+        // Seller exists - login successful
+        const loginData = await loginRes.json();
+        
+        const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
+        
+        setAuthUser({
+          id: loginData.seller.id,
+          name: loginData.seller.name,
+          email: loginData.seller.email,
+          token,
+          userType: "Seller",
+        });
+
+        resetScanCount();
+        onSuccess();
+      } else {
+        // Seller doesn't exist - register new seller
+        const randomPhone = `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+        
+        const registerRes = await fetch(`${BACKEND_URL}/api/sellers/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: googleName,
+            email: googleEmail.toLowerCase(),
+            phoneNumber: randomPhone, // Placeholder phone
+            password: `google_${payload.sub}`, // Use Google ID as password
+          }),
+        });
+
+        const registerData = await registerRes.json();
+
+        if (!registerRes.ok) {
+          throw new Error(registerData.message || registerData.error || "Registration failed");
+        }
+
+        // Auto-verify the seller (skip OTP for Google users)
+        const verifyRes = await fetch(`${BACKEND_URL}/api/sellers/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: googleEmail.toLowerCase(),
+            otp: "GOOGLE_AUTO_VERIFY", // Special code for Google users
+          }),
+        });
+
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          
+          const token = `vettcode_${verifyData.seller.id}_${Date.now()}`;
+          
+          setAuthUser({
+            id: verifyData.seller.id,
+            name: verifyData.seller.name,
+            email: verifyData.seller.email,
+            token,
+            userType: "Seller",
+          });
+
+          resetScanCount();
+          onSuccess();
+        } else {
+          // If verify fails, just login with the credentials
+          const loginRetryRes = await fetch(`${BACKEND_URL}/api/sellers/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: googleEmail.toLowerCase(),
+              password: `google_${payload.sub}`,
+            }),
+          });
+
+          if (loginRetryRes.ok) {
+            const loginData = await loginRetryRes.json();
+            
+            const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
+            
+            setAuthUser({
+              id: loginData.seller.id,
+              name: loginData.seller.name,
+              email: loginData.seller.email,
+              token,
+              userType: "Seller",
+            });
+
+            resetScanCount();
+            onSuccess();
+          } else {
+            throw new Error("Failed to complete Google authentication");
+          }
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google authentication failed");
+    } finally {
       setLoading(false);
     }
   }

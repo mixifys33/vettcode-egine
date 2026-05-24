@@ -11,7 +11,7 @@ export interface AuthUser {
 
 const AUTH_STORAGE_KEY = 'vettcode_auth';
 const SCAN_COUNT_KEY = 'vettcode_scan_count';
-const MAX_FREE_SCANS = 2;
+const MAX_FREE_SCANS = 10;
 
 // Get current authenticated user
 export function getAuthUser(): AuthUser | null {
@@ -67,7 +67,7 @@ export function canScan(): { allowed: boolean; reason?: string; remaining?: numb
     return { allowed: true };
   }
   
-  // Unauthenticated users limited to 2 scans
+  // Unauthenticated users limited to 10 scans
   const count = getScanCount();
   if (count >= MAX_FREE_SCANS) {
     return { 
