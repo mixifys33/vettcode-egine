@@ -72,25 +72,72 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = buildSmartBatchPrompt(projectName, batchIndex, totalBatches, batch);
 
-    const { content, model } = await chatCompletion(
-      [
-        { role: "system", content: SMART_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      apiKey
+    let content: string;
+    let model: string;
+    
+    try {
+      const result = await chatCompletion(
+        [
+          { role: "system", content: SMART_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        apiKey
+      );
+      content = result.content;
+      model = result.model;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI request failed";
+      console.error(`Batch ${batchIndex} AI error:`, message);
+      
+      // Return empty findings instead of failing
+      return NextResponse.json({
+        findings: [],
+        batchIndex,
+        modelUsed: "error",
+        error: message,
+      });
+    }
+
+    let parsed: { findings: AIFinding[] };
+    
+    try {
+      parsed = parseJsonFromModel<{ findings: AIFinding[] }>(content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "JSON parse failed";
+      console.error(`Batch ${batchIndex} parse error:`, message);
+      console.error('Raw content:', content.substring(0, 500));
+      
+      // Return empty findings instead of failing
+      return NextResponse.json({
+        findings: [],
+        batchIndex,
+        modelUsed: model,
+        error: `Parse error: ${message}`,
+      });
+    }
+
+    // Validate findings structure
+    const validFindings = (parsed.findings || []).filter(f => 
+      f && 
+      typeof f.id === 'string' && 
+      typeof f.title === 'string' && 
+      typeof f.file === 'string'
     );
 
-    const parsed = parseJsonFromModel<{ findings: AIFinding[] }>(content);
-
     return NextResponse.json({
-      findings: parsed.findings || [],
+      findings: validFindings,
       batchIndex,
       modelUsed: model,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Smart batch analysis failed";
-    console.error("Smart batch error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Smart batch error:", message, e);
+    
+    // Return empty findings to allow scan to continue
+    return NextResponse.json({ 
+      findings: [], 
+      error: message 
+    }, { status: 200 }); // Return 200 to prevent retry loops
   }
 }
 

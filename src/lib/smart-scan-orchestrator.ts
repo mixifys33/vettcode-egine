@@ -229,7 +229,7 @@ function createSmartBatches(
   extractedSections: ExtractedCode[],
   staticFindings: StaticFinding[]
 ): SmartBatch[] {
-  const MAX_CHARS_PER_BATCH = 20_000; // Reduced from 40K to prevent timeouts
+  const MAX_CHARS_PER_BATCH = 15_000; // Further reduced to 15K for better reliability
   const batches: SmartBatch[] = [];
   
   let currentBatch: SmartBatch = { sections: [], staticFindings: [] };
@@ -276,7 +276,7 @@ async function analyzeBatchWithAI(
 ): Promise<AIFinding[]> {
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (before Vercel's 60s)
+  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50s timeout (safer margin)
   
   try {
     const res = await fetch("/api/scan/smart-batch", {
@@ -295,8 +295,18 @@ async function analyzeBatchWithAI(
     clearTimeout(timeoutId);
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(error.error ?? "AI analysis failed");
+      const errorText = await res.text();
+      let errorMessage = `HTTP ${res.status}`;
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch {
+        errorMessage = errorText.substring(0, 200);
+      }
+      
+      console.error(`Batch ${batchIndex} failed:`, errorMessage);
+      return []; // Continue with other batches
     }
 
     const data = await res.json();
@@ -304,12 +314,14 @@ async function analyzeBatchWithAI(
   } catch (error) {
     clearTimeout(timeoutId);
     
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn(`Batch ${batchIndex} timed out, skipping...`);
-      return []; // Return empty findings instead of failing entire scan
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.warn(`Batch ${batchIndex} timed out, skipping...`);
+      } else {
+        console.error(`Batch ${batchIndex} failed:`, error.message);
+      }
     }
     
-    console.error(`Batch ${batchIndex} failed:`, error);
     return []; // Continue with other batches
   }
 }
