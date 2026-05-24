@@ -1,0 +1,44 @@
+feat: Add authentication system with scan limits
+
+Implemented comprehensive authentication system with free tier scan limits:
+
+Features:
+- Free tier: 2 scans without login (localStorage tracking)
+- Unlimited scans after authentication
+- Login/Register with OTP email verification
+- Users saved as "incomplete sellers" (no shop setup required)
+- Persistent sessions with logout functionality
+- Visual scan limit indicators
+
+Technical:
+- Created auth utilities (src/lib/auth.ts)
+- Created AuthModal component with 3 modes (login/register/verify)
+- Integrated with existing backend seller endpoints
+- Added scan limit checks before processing
+- Updated UI to show auth status and user info
+
+Backend Integration:
+- POST /api/sellers/register - Register with OTP
+- POST /api/sellers/verify - Verify OTP
+- POST /api/sellers/login - Authenticate
+- POST /api/sellers/resend-otp - Resend code
+
+Security:
+- Strong password requirements (8+ chars, mixed case, numbers, special chars)
+- OTP verification (6 digits, 10min expiry, 5 attempts)
+- Account lockout protection
+- Resend cooldown (3 minutes)
+
+Documentation:
+- Added AUTH_SETUP.md with complete setup guide
+- Updated README.md with authentication features
+- Created CHANGELOG.md for version tracking
+
+Files:
+- New: src/lib/auth.ts
+- New: src/components/AuthModal.tsx
+- New: AUTH_SETUP.md
+- New: CHANGELOG.md
+- Modified: src/app/page.tsx
+- Modified: .env.example
+- Modified: README.md

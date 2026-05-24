@@ -16,7 +16,16 @@ VettCode Engine analyzes your codebase for:
 
 ## 🚀 Key Features
 
-### 1. **Hybrid Analysis Pipeline**
+### 1. **Authentication & Scan Limits**
+
+- **Free tier:** 2 scans without login (tracked in browser)
+- **Unlimited scans:** After login/registration
+- **User accounts:** Saved as sellers (no shop setup required)
+- **OTP verification:** Email-based verification for new accounts
+
+See [AUTH_SETUP.md](./AUTH_SETUP.md) for detailed authentication documentation.
+
+### 2. **Hybrid Analysis Pipeline**
 
 ```
 User uploads codebase
@@ -32,14 +41,14 @@ Verification Layer → validates AI findings, removes false positives
 Report Generation → merged results with confidence scores
 ```
 
-### 2. **Token Efficiency**
+### 3. **Token Efficiency**
 
 - **70-90% token reduction** through smart AST extraction
 - Only sends high-risk code sections to AI (functions with user input, DB queries, auth logic, etc.)
 - Skips boilerplate, tests, configs, and low-risk code
 - 3 OpenRouter API keys in rotation for parallel processing
 
-### 3. **Accuracy & Verification**
+### 4. **Accuracy & Verification**
 
 - **Static analysis** catches obvious issues with high confidence
 - **AI analysis** provides deep reasoning on complex patterns
@@ -47,7 +56,7 @@ Report Generation → merged results with confidence scores
 - **Confidence scores** (high/medium/low) for every finding
 - **False positive detection** prevents hallucinated issues
 
-### 4. **Strict Scoring**
+### 5. **Strict Scoring**
 
 - **0-100 score** with no sugar-coating
 - Deducts heavily for critical/high severity issues
@@ -88,9 +97,14 @@ OPENROUTER_MODELS=openrouter/free,deepseek/deepseek-chat-v3-0324:free,qwen/qwen-
 
 # Site URL (optional, for OpenRouter rankings)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Backend API URL for authentication (required for login/register)
+NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
 ```
 
 Get free API keys at [OpenRouter](https://openrouter.ai/)
+
+**Note:** For authentication to work, you need the backend server running. See [AUTH_SETUP.md](./AUTH_SETUP.md) for details.
 
 ### 3. Run Locally
 
