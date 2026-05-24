@@ -77,7 +77,7 @@ export async function chatCompletion(
     models,
     messages,
     temperature: 0.2,
-    max_tokens: 8192,
+    max_tokens: 6144,
   };
 
   if (models.length === 1) {

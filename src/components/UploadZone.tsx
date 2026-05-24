@@ -55,12 +55,9 @@ export function UploadZone({
       onDragLeave={() => setActive(false)}
       onDrop={onDrop}
     >
-      <p style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>
-        Drop a project folder or ZIP archive
-      </p>
-      <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
-        node_modules, dist, .git, vendor, and other dependency/build paths are
-        automatically ignored
+      <p className="dropzone-title">Upload your codebase</p>
+      <p className="dropzone-hint">
+        Folder or ZIP. Dependencies and build output are excluded automatically.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
@@ -70,7 +67,7 @@ export function UploadZone({
           disabled={disabled}
           onClick={() => folderRef.current?.click()}
         >
-          Select project folder
+          Select folder
         </button>
         <button
           type="button"

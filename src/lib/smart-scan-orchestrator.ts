@@ -7,7 +7,10 @@
 import { runStaticAnalysis, shouldSendToAI, type StaticFinding } from "./static-analyzer";
 import { extractHighRiskCode, shouldAnalyzeFile, type ExtractedCode } from "./ast-extractor";
 import { verifyFindings, deduplicateFindings, calculateReportConfidence, type AIFinding, type VerifiedFinding } from "./verification-layer";
+import { selectFilesForQuickScan } from "./scan-priority";
 import type { CodeFile, VettReport, FileTreeNode } from "./types";
+
+export type ScanMode = "quick" | "deep";
 
 export interface ScanProgress {
   phase: string;
@@ -34,24 +37,31 @@ export async function runSmartScan(
   projectName: string,
   files: CodeFile[],
   ignoredCount: number,
-  onProgress: (phase: string, pct: number, detail?: string) => void
+  onProgress: (phase: string, pct: number, detail?: string) => void,
+  mode: ScanMode = "quick"
 ): Promise<SmartScanResult> {
-  
+  const aiFiles =
+    mode === "quick" ? selectFilesForQuickScan(files) : files;
+  const staticScopeLabel =
+    mode === "quick"
+      ? `${aiFiles.length} priority files (+ full-repo static pass)`
+      : `${files.length} files`;
+
   // Phase 1: Static Analysis (fast, catches 70-80% of issues)
-  onProgress("Static Analysis", 10, "Running pattern-based security checks...");
+  onProgress("Static analysis", 10, `Pattern checks across ${files.length} files…`);
   
   const staticFindings = runStaticAnalysis(files);
   
-  onProgress("Static Analysis Complete", 25, `Found ${staticFindings.length} potential issues`);
+  onProgress("Static analysis", 25, `${staticFindings.length} signals flagged`);
 
   // Phase 2: AST Extraction (extract only high-risk code sections)
-  onProgress("Code Analysis", 30, "Extracting high-risk code sections...");
+  onProgress("Code extraction", 30, `Targeting ${staticScopeLabel}…`);
   
   const extractedSections: ExtractedCode[] = [];
   let totalOriginalChars = 0;
   let totalExtractedChars = 0;
 
-  for (const file of files) {
+  for (const file of aiFiles) {
     if (!shouldAnalyzeFile(file.path)) continue;
     
     totalOriginalChars += file.content.length;
@@ -68,25 +78,36 @@ export async function runSmartScan(
     : 0;
 
   onProgress(
-    "Code Extraction Complete", 
-    40, 
-    `Extracted ${extractedSections.length} high-risk sections (${tokenReduction}% token reduction)`
+    "Code extraction",
+    40,
+    `${extractedSections.length} high-risk regions · ${tokenReduction}% token reduction`
   );
 
-  // Phase 3: AI Analysis (only on extracted high-risk sections + low-confidence static findings)
-  onProgress("AI Deep Analysis", 45, "Sending high-risk code to AI for deep reasoning...");
+  const staticForAi =
+    mode === "quick"
+      ? staticFindings.filter(shouldSendToAI).slice(0, 12)
+      : staticFindings.filter(shouldSendToAI);
+
+  onProgress(
+    mode === "quick" ? "AI review" : "AI deep review",
+    45,
+    mode === "quick"
+      ? "Reviewing priority surfaces…"
+      : "Parallel review across extracted regions…"
+  );
 
   const aiFindings = await runAIAnalysis(
     projectName,
     extractedSections,
-    staticFindings.filter(shouldSendToAI),
-    onProgress
+    staticForAi,
+    onProgress,
+    mode
   );
 
-  onProgress("AI Analysis Complete", 75, `AI found ${aiFindings.length} additional issues`);
+  onProgress("AI review", 75, `${aiFindings.length} additional findings`);
 
   // Phase 4: Verification Layer (cross-validate AI findings)
-  onProgress("Verification", 80, "Validating findings and removing false positives...");
+  onProgress("Verification", 80, "Cross-checking findings…");
 
   const verificationResult = verifyFindings(aiFindings, staticFindings, files);
   
@@ -95,7 +116,7 @@ export async function runSmartScan(
   );
 
   // Phase 5: Merge and deduplicate all findings
-  onProgress("Generating Report", 90, "Merging static analysis and AI findings...");
+  onProgress("Report", 90, "Assembling final report…");
 
   // Convert static findings to verified findings
   const verifiedStaticFindings: VerifiedFinding[] = staticFindings.map(sf => ({
@@ -188,29 +209,34 @@ async function runAIAnalysis(
   projectName: string,
   extractedSections: ExtractedCode[],
   lowConfidenceStaticFindings: StaticFinding[],
-  onProgress: (phase: string, pct: number, detail?: string) => void
+  onProgress: (phase: string, pct: number, detail?: string) => void,
+  mode: ScanMode
 ): Promise<AIFinding[]> {
   
   if (extractedSections.length === 0 && lowConfidenceStaticFindings.length === 0) {
     return [];
   }
 
-  // Create batches for AI analysis
-  const batches = createSmartBatches(extractedSections, lowConfidenceStaticFindings);
+  const batches = capSmartBatches(
+    createSmartBatches(extractedSections, lowConfidenceStaticFindings, mode),
+    mode === "quick" ? 10 : 48
+  );
   const aiFindings: AIFinding[] = [];
+  const phaseLabel = mode === "quick" ? "AI review" : "AI deep review";
 
   for (let i = 0; i < batches.length; i += PARALLEL_AI_CALLS) {
     const slice = batches.slice(i, i + PARALLEL_AI_CALLS);
+    const done = Math.min(i + slice.length, batches.length);
     
-    const progressPct = 45 + Math.round(((i + slice.length) / batches.length) * 30);
+    const progressPct = 45 + Math.round((done / batches.length) * 30);
     onProgress(
-      "AI Deep Analysis",
+      phaseLabel,
       progressPct,
-      `Analyzing batch ${i + 1}-${Math.min(i + PARALLEL_AI_CALLS, batches.length)} of ${batches.length}`
+      `Round ${Math.floor(i / PARALLEL_AI_CALLS) + 1} · ${done}/${batches.length} segments · 3 parallel workers`
     );
 
-    const promises = slice.map((batch, j) => 
-      analyzeBatchWithAI(projectName, i + j, batches.length, batch)
+    const promises = slice.map((batch, j) =>
+      analyzeBatchWithAI(projectName, i + j, batches.length, batch, j)
     );
 
     const results = await Promise.all(promises);
@@ -225,11 +251,47 @@ interface SmartBatch {
   staticFindings: StaticFinding[];
 }
 
+function batchCharSize(batch: SmartBatch): number {
+  const sectionChars = batch.sections.reduce(
+    (sum, s) => sum + s.sections.reduce((n, sec) => n + sec.code.length, 0),
+    0
+  );
+  const staticChars = batch.staticFindings.reduce(
+    (sum, f) => sum + f.evidence.length + f.title.length,
+    0
+  );
+  return sectionChars + staticChars;
+}
+
+function mergeSmartBatches(a: SmartBatch, b: SmartBatch): SmartBatch {
+  return {
+    sections: [...a.sections, ...b.sections],
+    staticFindings: [...a.staticFindings, ...b.staticFindings],
+  };
+}
+
+function capSmartBatches(batches: SmartBatch[], maxBatches: number): SmartBatch[] {
+  if (batches.length <= maxBatches) return batches;
+
+  const merged = [...batches];
+  while (merged.length > maxBatches) {
+    let smallest = 0;
+    for (let i = 1; i < merged.length; i++) {
+      if (batchCharSize(merged[i]) < batchCharSize(merged[smallest])) smallest = i;
+    }
+    const partner = smallest === merged.length - 1 ? smallest - 1 : smallest + 1;
+    merged[smallest] = mergeSmartBatches(merged[smallest], merged[partner]);
+    merged.splice(partner, 1);
+  }
+  return merged;
+}
+
 function createSmartBatches(
   extractedSections: ExtractedCode[],
-  staticFindings: StaticFinding[]
+  staticFindings: StaticFinding[],
+  mode: ScanMode
 ): SmartBatch[] {
-  const MAX_CHARS_PER_BATCH = 15_000; // Further reduced to 15K for better reliability
+  const MAX_CHARS_PER_BATCH = mode === "quick" ? 42_000 : 32_000;
   const batches: SmartBatch[] = [];
   
   let currentBatch: SmartBatch = { sections: [], staticFindings: [] };
@@ -272,11 +334,12 @@ async function analyzeBatchWithAI(
   projectName: string,
   batchIndex: number,
   totalBatches: number,
-  batch: SmartBatch
+  batch: SmartBatch,
+  parallelSlot: number
 ): Promise<AIFinding[]> {
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50s timeout (safer margin)
+  const timeoutId = setTimeout(() => controller.abort(), 52000);
   
   try {
     const res = await fetch("/api/scan/smart-batch", {
@@ -287,7 +350,7 @@ async function analyzeBatchWithAI(
         batchIndex,
         totalBatches,
         batch,
-        keySlot: batchIndex,
+        keySlot: parallelSlot % PARALLEL_AI_CALLS,
       }),
       signal: controller.signal,
     });

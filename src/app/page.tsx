@@ -6,29 +6,55 @@ import { ScanProgress } from "@/components/ScanProgress";
 import { ReportView } from "@/components/ReportView";
 import { AuthModal } from "@/components/AuthModal";
 import { collectFromFileList, collectFromZip } from "@/lib/file-collector";
-import { runSmartScan } from "@/lib/smart-scan-orchestrator";
-import { 
-  canScan, 
-  incrementScanCount, 
-  isAuthenticated, 
-  getAuthUser, 
-  clearAuth 
+import { runSmartScan, type ScanMode } from "@/lib/smart-scan-orchestrator";
+import {
+  canScan,
+  incrementScanCount,
+  isAuthenticated,
+  getAuthUser,
+  clearAuth,
 } from "@/lib/auth";
 import type { VettReport } from "@/lib/types";
 
+function PrivacyBanner() {
+  return (
+    <aside className="privacy-banner">
+      <svg
+        className="privacy-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden
+      >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+      <div>
+        <strong>Your code stays in your browser</strong>
+        Source files are processed in memory on your device. We do not store your
+        codebase unless you explicitly choose to save a report. Account credentials
+        are retained for authentication and product analytics. Reloading or starting
+        a new scan clears in-session application data.
+      </div>
+    </aside>
+  );
+}
+
 export default function Home() {
   const [projectName, setProjectName] = useState("my-project");
+  const [scanMode, setScanMode] = useState<ScanMode>("quick");
   const [scanning, setScanning] = useState(false);
+  const [scanStartedAt, setScanStartedAt] = useState<number | undefined>();
   const [phase, setPhase] = useState("");
   const [progress, setProgress] = useState(0);
   const [detail, setDetail] = useState<string>();
   const [report, setReport] = useState<VettReport | null>(null);
+  const [lastScanMode, setLastScanMode] = useState<ScanMode>("quick");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState(getAuthUser());
 
-  // Update user state when auth changes
   useEffect(() => {
     setUser(getAuthUser());
   }, [showAuthModal]);
@@ -45,19 +71,20 @@ export default function Home() {
       warnings: string[];
     }>
   ) {
-    // Check if user can scan
     const scanCheck = canScan();
     if (!scanCheck.allowed) {
       setShowAuthModal(true);
-      setError(scanCheck.reason || 'Please login to continue scanning');
+      setError(scanCheck.reason || "Sign in to continue scanning.");
       return;
     }
 
     setError(null);
     setReport(null);
     setScanning(true);
+    setScanStartedAt(Date.now());
     setProgress(0);
     setPhase("Collecting files");
+    setLastScanMode(scanMode);
 
     try {
       const result = await collect();
@@ -66,7 +93,7 @@ export default function Home() {
       if (result.files.length === 0) {
         throw new Error(
           result.warnings[0] ??
-            "No source files to scan. Pick a folder with application code."
+            "No source files found. Upload a folder with application code."
         );
       }
 
@@ -78,131 +105,149 @@ export default function Home() {
           setPhase(p);
           setProgress(pct);
           setDetail(d);
-        }
+        },
+        scanMode
       );
 
       setReport(scanResult.report);
-      
-      // Increment scan count for unauthenticated users
+
       if (!isAuthenticated()) {
         incrementScanCount();
       }
-      
-      // Log stats for debugging
-      console.log("Scan stats:", scanResult.stats);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
     } finally {
       setScanning(false);
+      setScanStartedAt(undefined);
     }
   }
 
+  const scanQuota = canScan();
+
   return (
     <main className="container">
-      <header className="hero">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h1 style={{ margin: 0 }}>
-            <span>Vettcode</span> Engine
-          </h1>
-          
+      <header className="site-header">
+        <a href="/" className="brand">
+          <span className="brand-mark">V</span>
+          <span className="brand-text">
+            <span className="brand-name">Vettcode Engine</span>
+            <span className="brand-tag">Open source scanner</span>
+          </span>
+        </a>
+
+        <div className="header-actions">
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Welcome, {user.name}
-              </span>
-              <button
-                onClick={handleLogout}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface2)',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                Logout
+            <>
+              <span className="user-pill">{user.name}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleLogout}>
+                Sign out
               </button>
-            </div>
+            </>
           ) : (
             <button
+              type="button"
+              className="btn btn-primary btn-sm"
               onClick={() => setShowAuthModal(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid var(--primary)',
-                background: 'var(--primary)',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-              }}
             >
-              Login / Register
+              Sign in
             </button>
           )}
         </div>
-        
-        <p>
-          Upload any codebase. AI vets security holes, production failures, typing
-          mistakes, database risks, and logic that can break your system — then
-          scores it harshly from 0–100 with zero sugar-coating.
-        </p>
-        
-        <div style={{ 
-          marginTop: '1rem', 
-          padding: '0.75rem 1rem', 
-          background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: '8px',
-          fontSize: '0.9rem',
-          fontWeight: 500,
-          color: '#22c55e',
-          textAlign: 'center'
-        }}>
-          🎉 <strong>100% FREE & Open Source</strong> — No payments, no credits required!
-        </div>
-        
-        {!isAuthenticated() && (
-          <div style={{ 
-            marginTop: '0.75rem', 
-            padding: '0.75rem', 
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            color: 'var(--text-muted)'
-          }}>
-            ℹ️ <strong>Free tier:</strong> {canScan().remaining || 0} scan{canScan().remaining === 1 ? '' : 's'} remaining without login. 
-            <strong style={{ color: 'var(--primary)' }}> Register for unlimited FREE scans</strong> (no payment needed).
-          </div>
-        )}
       </header>
 
       {!report && (
         <>
+          <section className="hero">
+            <p className="hero-eyebrow">
+              <strong>Open source</strong> · security & production readiness
+            </p>
+            <h1>
+              Vet your codebase with{" "}
+              <span className="gradient">confidence</span>
+            </h1>
+            <p className="hero-lead">
+              Static analysis plus targeted AI review. Strict scoring, verified
+              findings, and actionable remediation — built for teams who ship
+              with discipline.
+            </p>
+            <div className="hero-features">
+              <span>Security & injection risks</span>
+              <span>Production failure patterns</span>
+              <span>Logic & data integrity</span>
+              <span>0–100 strict score</span>
+            </div>
+          </section>
+
+          <PrivacyBanner />
+
+          {!isAuthenticated() && scanQuota.remaining != null && (
+            <p className="tier-note">
+              Guest scans remaining: {scanQuota.remaining}.{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => setShowAuthModal(true)}
+              >
+                Create a free account
+              </button>{" "}
+              for unlimited scans.
+            </p>
+          )}
+
+          <div className="scan-mode-panel">
+            <p className="scan-mode-label">Analysis mode</p>
+            <div className="scan-mode-grid">
+              <label
+                className={`scan-mode-option ${scanMode === "quick" ? "active" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="scanMode"
+                  value="quick"
+                  checked={scanMode === "quick"}
+                  disabled={scanning}
+                  onChange={() => setScanMode("quick")}
+                />
+                <div className="scan-mode-title">Quick scan</div>
+                <div className="scan-mode-desc">
+                  Full static pass plus AI on priority surfaces — routes, auth,
+                  config, and high-risk regions. Typically 1–4 minutes.
+                </div>
+                <div className="scan-mode-eta">Recommended for first pass</div>
+              </label>
+
+              <label
+                className={`scan-mode-option ${scanMode === "deep" ? "active" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="scanMode"
+                  value="deep"
+                  checked={scanMode === "deep"}
+                  disabled={scanning}
+                  onChange={() => setScanMode("deep")}
+                />
+                <div className="scan-mode-title">Deep scan</div>
+                <div className="scan-mode-desc">
+                  Broader AI coverage with parallel workers (3 API lanes). Best for
+                  release gates; large repos may take longer.
+                </div>
+                <div className="scan-mode-eta">Up to ~48 targeted AI segments</div>
+              </label>
+            </div>
+          </div>
+
           <div className="card" style={{ marginBottom: "1rem" }}>
-            <label
-              htmlFor="project-name"
-              style={{ display: "block", marginBottom: "0.35rem", fontSize: "0.9rem" }}
-            >
-              Project name (for the report)
+            <label htmlFor="project-name" className="field-label">
+              Project name
             </label>
             <input
               id="project-name"
               type="text"
+              className="field-input"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               disabled={scanning}
-              style={{
-                width: "100%",
-                padding: "0.6rem 0.75rem",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                background: "var(--surface2)",
-                color: "var(--text)",
-              }}
             />
           </div>
 
@@ -219,7 +264,13 @@ export default function Home() {
       )}
 
       {scanning && (
-        <ScanProgress phase={phase} progress={progress} detail={detail} />
+        <ScanProgress
+          phase={phase}
+          progress={progress}
+          detail={detail}
+          scanMode={lastScanMode}
+          startedAt={scanStartedAt}
+        />
       )}
 
       {error && (
@@ -235,6 +286,7 @@ export default function Home() {
         <ReportView
           report={report}
           warnings={warnings}
+          scanMode={lastScanMode}
           onReset={() => {
             setReport(null);
             setError(null);
