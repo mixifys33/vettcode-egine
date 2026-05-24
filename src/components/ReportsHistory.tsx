@@ -6,7 +6,7 @@ import { getSavedReports, deleteReport, updateReportName } from "@/lib/report-st
 import { isAuthenticated } from "@/lib/auth";
 
 interface ReportsHistoryProps {
-  currentReportId?: string;
+  currentReportId?: string | null;
   onSelectReport: (report: SavedReport) => void;
   onClose?: () => void;
 }

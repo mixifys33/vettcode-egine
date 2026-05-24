@@ -715,6 +715,134 @@ export function ReportView({
         </>
       )}
 
+      {/* Monetize on VETTCODE Section */}
+      {report.score >= 50 && (
+        <div style={{
+          marginTop: "1.5rem",
+          padding: "1.5rem",
+          background: "linear-gradient(135deg, rgba(34, 211, 165, 0.1), rgba(91, 124, 250, 0.1))",
+          border: "2px solid var(--accent)",
+          borderRadius: "12px",
+          position: "relative",
+          overflow: "hidden"
+        }}>
+          <div style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: "120px",
+            height: "120px",
+            background: "radial-gradient(circle at top right, rgba(34, 211, 165, 0.2), transparent)",
+            pointerEvents: "none"
+          }} />
+          
+          <div style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "1rem",
+            marginBottom: "1rem",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
+              💰
+            </div>
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <h3 style={{
+                fontSize: "1.25rem",
+                fontWeight: 700,
+                marginBottom: "0.5rem",
+                background: "linear-gradient(90deg, var(--accent), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent"
+              }}>
+                Ready to Earn from Your Code?
+              </h3>
+              <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
+                Your code scored <span style={{ fontWeight: 700, color: "var(--accent)" }}>{report.grade}</span>! 
+                Pre-list it on VETTCODE and get notified when corporate buyers can purchase it.
+              </p>
+            </div>
+          </div>
+          
+          <div style={{
+            background: "rgba(0, 0, 0, 0.2)",
+            borderRadius: "8px",
+            padding: "1rem",
+            marginBottom: "1rem",
+            border: "1px solid rgba(34, 211, 165, 0.3)"
+          }}>
+            <ul style={{ 
+              listStyle: "none", 
+              padding: 0, 
+              margin: 0,
+              fontSize: "0.9rem",
+              lineHeight: "1.8"
+            }}>
+              {[
+                { icon: "✓", text: "No public listing yet - your code stays private" },
+                { icon: "💵", text: "Set your own price when the platform launches" },
+                { icon: "📧", text: "Get notified the moment buyers can purchase" },
+                { icon: "🏆", text: "Early pre-listers get priority placement & badges" }
+              ].map((item, idx) => (
+                <li key={idx} style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "0.75rem",
+                  marginBottom: idx < 3 ? "0.5rem" : "0"
+                }}>
+                  <span style={{ color: "var(--accent)", fontWeight: "bold", flexShrink: 0 }}>
+                    {item.icon}
+                  </span>
+                  <span style={{ color: "var(--text)" }}>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          <a
+            href="https://vettcodedev.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "1rem 1.5rem",
+              fontSize: "1rem",
+              fontWeight: 700,
+              textAlign: "center",
+              background: "linear-gradient(135deg, var(--accent), #14b88a)",
+              color: "#06080d",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              textDecoration: "none",
+              boxShadow: "0 4px 12px rgba(34, 211, 165, 0.3)"
+            }}
+            onMouseEnter={(e: any) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(34, 211, 165, 0.4)";
+            }}
+            onMouseLeave={(e: any) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 211, 165, 0.3)";
+            }}
+          >
+            🚀 Start Earning from Your Code on VETTCODE
+          </a>
+          
+          <p style={{
+            marginTop: "0.75rem",
+            fontSize: "0.75rem",
+            color: "var(--muted)",
+            textAlign: "center"
+          }}>
+            Free to pre-list • No commitment • Set your price later
+          </p>
+        </div>
+      )}
+
       <div
         style={{
           marginTop: "1.75rem",
