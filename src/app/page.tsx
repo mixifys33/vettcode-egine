@@ -150,9 +150,23 @@ export default function Home() {
           scores it harshly from 0–100 with zero sugar-coating.
         </p>
         
+        <div style={{ 
+          marginTop: '1rem', 
+          padding: '0.75rem 1rem', 
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          borderRadius: '8px',
+          fontSize: '0.9rem',
+          fontWeight: 500,
+          color: '#22c55e',
+          textAlign: 'center'
+        }}>
+          🎉 <strong>100% FREE & Open Source</strong> — No payments, no credits required!
+        </div>
+        
         {!isAuthenticated() && (
           <div style={{ 
-            marginTop: '1rem', 
+            marginTop: '0.75rem', 
             padding: '0.75rem', 
             background: 'rgba(59, 130, 246, 0.1)',
             border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -160,8 +174,8 @@ export default function Home() {
             fontSize: '0.9rem',
             color: 'var(--text-muted)'
           }}>
-            ℹ️ Free users: {canScan().remaining || 0} scan{canScan().remaining === 1 ? '' : 's'} remaining. 
-            Login for unlimited scans.
+            ℹ️ <strong>Free tier:</strong> {canScan().remaining || 0} scan{canScan().remaining === 1 ? '' : 's'} remaining without login. 
+            <strong style={{ color: 'var(--primary)' }}> Register for unlimited FREE scans</strong> (no payment needed).
           </div>
         )}
       </header>

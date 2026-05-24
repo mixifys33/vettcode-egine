@@ -375,7 +375,8 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
         <div className="auth-note">
           <small>
-            Note: You're registering as a seller account. No shop setup required for code scanning.
+            <strong>✨ 100% FREE Forever</strong> — No credit card, no payments, no hidden fees. 
+            Register to get unlimited code scans at zero cost!
           </small>
         </div>
       </div>

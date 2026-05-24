@@ -1,6 +1,19 @@
 # VettCode Engine
 
-**AI-powered codebase security and quality scanner** — Upload any codebase and get a brutally honest 0-100 security/quality score with detailed vulnerability reports.
+**🎉 100% FREE & Open Source** — AI-powered codebase security and quality scanner with no payments or credits required.
+
+Upload any codebase and get a brutally honest 0-100 security/quality score with detailed vulnerability reports.
+
+> **💰 [Read why VettCode is completely FREE →](./FREE.md)**
+
+## 🆓 Completely Free
+
+- ✅ **No payments** — Zero cost, forever
+- ✅ **No credit card** — Never required
+- ✅ **No hidden fees** — Truly free
+- ✅ **Open source** — MIT License
+- ✅ **Unlimited scans** — Just register (free) for unlimited access
+- ✅ **2 free scans** — No registration needed to try it out
 
 ## 🎯 What It Does
 
@@ -73,6 +86,8 @@ Report Generation → merged results with confidence scores
 - **Styling:** CSS variables + Tailwind-inspired utilities
 
 ## 🛠️ Setup
+
+> **💡 Note:** VettCode Engine is **100% FREE**. You only need OpenRouter API keys (also free) to use the AI analysis features. No payments or subscriptions required!
 
 ### 1. Clone & Install
 
