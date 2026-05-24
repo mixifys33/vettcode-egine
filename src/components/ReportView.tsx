@@ -111,6 +111,34 @@ export function ReportView({
     {} as Record<string, number>
   );
   
+  // Smart default severity filter: show highest severity available
+  const getDefaultSeverities = (): string[] => {
+    if (counts.critical > 0) return ['critical'];
+    if (counts.high > 0) return ['high'];
+    if (counts.medium > 0) return ['medium'];
+    if (counts.low > 0) return ['low'];
+    if (counts.info > 0) return ['info'];
+    return ['critical', 'high', 'medium', 'low', 'info']; // Show all if none found
+  };
+  
+  const [selectedSeverities, setSelectedSeverities] = useState<string[]>(getDefaultSeverities());
+  
+  // Toggle severity filter
+  const toggleSeverity = (severity: string) => {
+    setSelectedSeverities(prev => {
+      if (prev.includes(severity)) {
+        // Don't allow deselecting all
+        if (prev.length === 1) return prev;
+        return prev.filter(s => s !== severity);
+      } else {
+        return [...prev, severity];
+      }
+    });
+  };
+  
+  // Filter findings by selected severities
+  const filteredFindings = sorted.filter(f => selectedSeverities.includes(f.severity));
+  
   // Limit critical blockers display
   const BLOCKERS_PREVIEW_LIMIT = 5;
   const hasMoreBlockers = report.criticalBlockers.length > BLOCKERS_PREVIEW_LIMIT;
@@ -127,10 +155,10 @@ export function ReportView({
   
   // Limit findings display
   const FINDINGS_PREVIEW_LIMIT = 10;
-  const hasMoreFindings = sorted.length > FINDINGS_PREVIEW_LIMIT;
+  const hasMoreFindings = filteredFindings.length > FINDINGS_PREVIEW_LIMIT;
   const displayedFindings = showAllFindings
-    ? sorted
-    : sorted.slice(0, FINDINGS_PREVIEW_LIMIT);
+    ? filteredFindings
+    : filteredFindings.slice(0, FINDINGS_PREVIEW_LIMIT);
 
   return (
     <div style={{ marginTop: "1.5rem" }}>
@@ -329,9 +357,89 @@ export function ReportView({
       )}
 
       <h2 className="section-heading" style={{ marginBottom: "0.75rem" }}>
-        Findings ({sorted.length})
+        Findings ({filteredFindings.length} of {sorted.length})
       </h2>
-      {sorted.length === 0 ? (
+      
+      {/* Severity Filter Toggles */}
+      <div style={{ 
+        marginBottom: "1rem", 
+        padding: "1rem",
+        background: "var(--bg-secondary)",
+        borderRadius: "8px",
+        border: "1px solid var(--border)"
+      }}>
+        <p style={{ 
+          fontSize: "0.85rem", 
+          color: "var(--muted)", 
+          marginBottom: "0.75rem",
+          fontWeight: 500
+        }}>
+          Filter by severity:
+        </p>
+        <div style={{ 
+          display: "flex", 
+          gap: "0.5rem", 
+          flexWrap: "wrap" 
+        }}>
+          {(["critical", "high", "medium", "low", "info"] as const).map((severity) => {
+            const count = counts[severity] || 0;
+            const isSelected = selectedSeverities.includes(severity);
+            const isDisabled = count === 0;
+            
+            return (
+              <button
+                key={severity}
+                type="button"
+                onClick={() => !isDisabled && toggleSeverity(severity)}
+                disabled={isDisabled}
+                style={{
+                  padding: "0.5rem 1rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  border: `2px solid ${isSelected ? `var(--${severity === 'critical' ? 'danger' : severity === 'high' ? 'danger' : severity === 'medium' ? 'warning' : severity === 'low' ? 'accent' : 'muted'})` : 'var(--border)'}`,
+                  borderRadius: "6px",
+                  background: isSelected 
+                    ? `var(--${severity === 'critical' ? 'danger' : severity === 'high' ? 'danger' : severity === 'medium' ? 'warning' : severity === 'low' ? 'accent' : 'muted'})` 
+                    : 'transparent',
+                  color: isSelected ? '#fff' : 'var(--text)',
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isDisabled ? 0.4 : 1,
+                  transition: "all 0.2s ease",
+                  textTransform: "capitalize"
+                }}
+                onMouseEnter={(e) => {
+                  if (!isDisabled && !isSelected) {
+                    e.currentTarget.style.borderColor = `var(--${severity === 'critical' ? 'danger' : severity === 'high' ? 'danger' : severity === 'medium' ? 'warning' : severity === 'low' ? 'accent' : 'muted'})`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isDisabled && !isSelected) {
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                  }
+                }}
+              >
+                {severity} ({count})
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ 
+          fontSize: "0.75rem", 
+          color: "var(--muted)", 
+          marginTop: "0.75rem",
+          fontStyle: "italic"
+        }}>
+          {selectedSeverities.length === 1 
+            ? `Showing only ${selectedSeverities[0]} severity findings` 
+            : `Showing ${selectedSeverities.length} severity levels`}
+        </p>
+      </div>
+      
+      {filteredFindings.length === 0 ? (
+        <p className="card" style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
+          No findings match the selected severity filters.
+        </p>
+      ) : sorted.length === 0 ? (
         <p className="card" style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
           No issues reported. Validate with tests and manual review before
           production — automated scans can miss context-specific risks.
@@ -351,7 +459,7 @@ export function ReportView({
             >
               {showAllFindings 
                 ? "Show less findings" 
-                : `Show ${sorted.length - FINDINGS_PREVIEW_LIMIT} more findings`}
+                : `Show ${filteredFindings.length - FINDINGS_PREVIEW_LIMIT} more findings`}
             </button>
           )}
         </>
