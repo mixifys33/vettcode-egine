@@ -26,28 +26,152 @@ export interface ExtractedCode {
 
 // High-risk patterns that indicate code should be analyzed by AI
 const RISK_INDICATORS = {
-  // Security-sensitive operations
-  userInput: ["req.body", "req.query", "req.params", "request.body", "params", "searchParams"],
-  database: ["query", "execute", "findOne", "findMany", "create", "update", "delete", "raw"],
-  fileSystem: ["readFile", "writeFile", "unlink", "rmdir", "mkdir", "createReadStream"],
-  network: ["fetch", "axios", "http.request", "https.request"],
-  auth: ["sign", "verify", "hash", "compare", "authenticate", "authorize", "session"],
-  crypto: ["createHash", "createCipher", "randomBytes", "pbkdf2"],
-  exec: ["exec", "spawn", "execSync", "spawnSync", "child_process"],
+  // Security-sensitive operations (cross-language)
+  userInput: [
+    // JavaScript/TypeScript
+    "req.body", "req.query", "req.params", "request.body", "params", "searchParams",
+    // Python
+    "request.form", "request.args", "request.json", "input(", "sys.argv",
+    // Java
+    "getParameter", "getInputStream", "getReader", "Scanner",
+    // PHP
+    "$_GET", "$_POST", "$_REQUEST", "$_COOKIE", "$_SERVER",
+    // Go
+    "r.FormValue", "r.PostFormValue", "r.URL.Query",
+    // Ruby
+    "params[", "request.params", "gets",
+    // C#
+    "Request.Form", "Request.QueryString", "Console.ReadLine",
+  ],
+  database: [
+    // JavaScript/TypeScript
+    "query", "execute", "findOne", "findMany", "create", "update", "delete", "raw",
+    // Python
+    "cursor.execute", "session.query", "filter", "get", "all()",
+    // Java
+    "executeQuery", "executeUpdate", "prepareStatement", "createQuery",
+    // PHP
+    "mysqli_query", "mysql_query", "PDO", "->query", "->exec",
+    // Go
+    "db.Query", "db.Exec", "db.QueryRow",
+    // Ruby
+    "ActiveRecord", ".find", ".where", ".create",
+    // C#
+    "ExecuteReader", "ExecuteNonQuery", "SqlCommand",
+  ],
+  fileSystem: [
+    // JavaScript/TypeScript
+    "readFile", "writeFile", "unlink", "rmdir", "mkdir", "createReadStream",
+    // Python
+    "open(", "os.remove", "os.rmdir", "shutil", "pathlib",
+    // Java
+    "FileReader", "FileWriter", "Files.read", "Files.write",
+    // PHP
+    "fopen", "file_get_contents", "file_put_contents", "unlink",
+    // Go
+    "os.Open", "os.Create", "ioutil.ReadFile", "os.Remove",
+    // Ruby
+    "File.open", "File.read", "File.write", "File.delete",
+    // C#
+    "File.Read", "File.Write", "File.Delete", "StreamReader",
+  ],
+  network: [
+    // JavaScript/TypeScript
+    "fetch", "axios", "http.request", "https.request",
+    // Python
+    "requests.", "urllib", "httplib", "http.client",
+    // Java
+    "HttpURLConnection", "HttpClient", "RestTemplate",
+    // PHP
+    "curl_", "file_get_contents", "fopen('http",
+    // Go
+    "http.Get", "http.Post", "http.Client",
+    // Ruby
+    "Net::HTTP", "open-uri", "RestClient",
+    // C#
+    "HttpClient", "WebRequest", "HttpWebRequest",
+  ],
+  auth: [
+    // Cross-language
+    "sign", "verify", "hash", "compare", "authenticate", "authorize", "session",
+    "password", "token", "jwt", "oauth", "login", "logout",
+    // Python
+    "hashlib", "bcrypt", "passlib",
+    // Java
+    "MessageDigest", "BCrypt", "PasswordEncoder",
+    // PHP
+    "password_hash", "password_verify", "md5", "sha1",
+    // Go
+    "bcrypt.Generate", "bcrypt.Compare",
+    // Ruby
+    "BCrypt", "Devise",
+    // C#
+    "PasswordHasher", "SignInManager",
+  ],
+  crypto: [
+    "createHash", "createCipher", "randomBytes", "pbkdf2", "encrypt", "decrypt",
+    "AES", "RSA", "crypto", "cipher",
+  ],
+  exec: [
+    // JavaScript/TypeScript
+    "exec", "spawn", "execSync", "spawnSync", "child_process",
+    // Python
+    "os.system", "subprocess", "exec(", "eval(",
+    // Java
+    "Runtime.exec", "ProcessBuilder",
+    // PHP
+    "exec(", "shell_exec", "system(", "passthru",
+    // Go
+    "exec.Command", "os.StartProcess",
+    // Ruby
+    "system(", "exec(", "`", "%x",
+    // C#
+    "Process.Start", "ProcessStartInfo",
+  ],
   
   // Code quality indicators
   complexity: ["if", "else", "switch", "for", "while", "catch"],
-  async: ["async", "await", "Promise", ".then", ".catch"],
+  async: ["async", "await", "Promise", ".then", ".catch", "goroutine", "channel"],
 };
 
 function detectLanguage(filepath: string): string {
+  // JavaScript/TypeScript
   if (/\.tsx?$/.test(filepath)) return "typescript";
   if (/\.jsx?$/.test(filepath)) return "javascript";
-  if (/\.py$/.test(filepath)) return "python";
-  if (/\.go$/.test(filepath)) return "go";
+  
+  // Python
+  if (/\.pyw?$/.test(filepath)) return "python";
+  
+  // Java
   if (/\.java$/.test(filepath)) return "java";
-  if (/\.php$/.test(filepath)) return "php";
-  if (/\.rb$/.test(filepath)) return "ruby";
+  
+  // PHP
+  if (/\.php[345]?$/.test(filepath)) return "php";
+  
+  // Go
+  if (/\.go$/.test(filepath)) return "go";
+  
+  // Ruby
+  if (/\.(rb|rake)$/.test(filepath)) return "ruby";
+  
+  // C#
+  if (/\.cs$/.test(filepath)) return "csharp";
+  
+  // C/C++
+  if (/\.(c|cpp|cc|cxx|h|hpp|hxx)$/.test(filepath)) return "cpp";
+  
+  // Rust
+  if (/\.rs$/.test(filepath)) return "rust";
+  
+  // Kotlin
+  if (/\.kts?$/.test(filepath)) return "kotlin";
+  
+  // Swift
+  if (/\.swift$/.test(filepath)) return "swift";
+  
+  // Scala
+  if (/\.scala$/.test(filepath)) return "scala";
+  
   return "unknown";
 }
 
@@ -322,7 +446,44 @@ function extractWithPatterns(
 }
 
 export function shouldAnalyzeFile(filepath: string): boolean {
-  // Skip files that are unlikely to have security issues
+  // Only analyze source code files
+  const analyzePatterns = [
+    // JavaScript/TypeScript
+    /\.[jt]sx?$/,
+    // Python
+    /\.py$/,
+    /\.pyw$/,
+    // Java
+    /\.java$/,
+    // PHP
+    /\.php$/,
+    /\.php[345]?$/,
+    // Go
+    /\.go$/,
+    // Ruby
+    /\.rb$/,
+    /\.rake$/,
+    // C#
+    /\.cs$/,
+    // C/C++
+    /\.[ch]$/,
+    /\.cpp$/,
+    /\.cc$/,
+    /\.cxx$/,
+    /\.hpp$/,
+    /\.hxx$/,
+    // Rust
+    /\.rs$/,
+    // Kotlin
+    /\.kt$/,
+    /\.kts$/,
+    // Swift
+    /\.swift$/,
+    // Scala
+    /\.scala$/,
+  ];
+
+  // Skip test files, configs, and non-code files
   const skipPatterns = [
     /\.test\.[jt]sx?$/,
     /\.spec\.[jt]sx?$/,
@@ -333,13 +494,26 @@ export function shouldAnalyzeFile(filepath: string): boolean {
     /\.config\.[jt]s$/,
     /package-lock\.json$/,
     /yarn\.lock$/,
+    /\.lock$/,
     /\.md$/,
     /\.txt$/,
     /\.json$/,
     /\.css$/,
     /\.scss$/,
+    /\.sass$/,
+    /\.less$/,
     /\.html$/,
+    /\.xml$/,
+    /\.svg$/,
+    /\.yml$/,
+    /\.yaml$/,
   ];
 
-  return !skipPatterns.some(pattern => pattern.test(filepath));
+  // First check if it should be skipped
+  if (skipPatterns.some(pattern => pattern.test(filepath))) {
+    return false;
+  }
+
+  // Then check if it matches a source code pattern
+  return analyzePatterns.some(pattern => pattern.test(filepath));
 }

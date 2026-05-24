@@ -244,7 +244,7 @@ export function ReportView({ report, warnings, onReset }: ReportViewProps) {
                 scannedAt: report.metadata?.scannedAt || new Date().toISOString(),
                 totalFiles: report.metadata?.filesScanned || 0,
                 totalLines: report.metadata?.linesScanned || 0,
-                fileTree: report.metadata.fileTree,
+                fileTree: report.metadata?.fileTree || [],
               };
               const blob = new Blob([JSON.stringify(fileTreeData, null, 2)], {
                 type: "application/json",
