@@ -6,6 +6,8 @@ import { ScanProgress } from "@/components/ScanProgress";
 import { ReportView } from "@/components/ReportView";
 import { AuthModal } from "@/components/AuthModal";
 import { collectFromFileList, collectFromZip } from "@/lib/file-collector";
+import { collectFromRemoteUrl } from "@/lib/collect-from-remote";
+import { RepoUrlInput } from "@/components/RepoUrlInput";
 import { runSmartScan, type ScanMode } from "@/lib/smart-scan-orchestrator";
 import {
   canScan,
@@ -31,10 +33,9 @@ function PrivacyBanner() {
       </svg>
       <div>
         <strong>Your code stays in your browser</strong>
-        Source files are processed in memory on your device. We do not store your
-        codebase unless you explicitly choose to save a report. Account credentials
-        are retained for authentication and product analytics. Reloading or starting
-        a new scan clears in-session application data.
+        Uploads and repository URLs are processed in memory for your session. We do
+        not store your codebase. Pasting a repo link fetches a snapshot to scan —
+        nothing is kept after you reload or start a new scan.
       </div>
     </aside>
   );
@@ -250,6 +251,21 @@ export default function Home() {
               disabled={scanning}
             />
           </div>
+
+          <RepoUrlInput
+            disabled={scanning}
+            onScan={(url) =>
+              startScan(async () => {
+                setPhase("Fetching repository");
+                setDetail("Downloading source from remote…");
+                const result = await collectFromRemoteUrl(url);
+                setProjectName(result.projectName);
+                return result;
+              })
+            }
+          />
+
+          <p className="upload-divider">or upload from your computer</p>
 
           <UploadZone
             disabled={scanning}
