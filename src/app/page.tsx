@@ -171,13 +171,7 @@ export default function Home() {
   const scanQuota = canScan();
 
   return (
-    <main 
-      className="container" 
-      style={{ 
-        paddingLeft: isAuthenticated() && sidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 768 ? "340px" : "0",
-        transition: "padding-left 0.3s ease"
-      }}
-    >
+    <main className="container">
       {/* Reports History Sidebar */}
       {isAuthenticated() && (
         <ReportsHistory

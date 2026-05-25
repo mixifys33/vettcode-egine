@@ -28,10 +28,8 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      // Auto-open on desktop, closed on mobile
-      if (!mobile) {
-        setIsOpen(true);
-      }
+      // Sidebar starts closed on all screen sizes (overlay mode)
+      setIsOpen(false);
     };
     
     checkMobile();
@@ -103,7 +101,7 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
         style={{
           position: "fixed",
           top: "1rem",
-          left: isOpen && !isMobile ? "340px" : "1rem",
+          left: "1rem",
           zIndex: 1002,
           padding: "0.75rem",
           background: "var(--bg-elevated)",
@@ -130,7 +128,7 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
       >
         {isOpen ? <X size={18} /> : <Menu size={18} />}
         {!isMobile && <span>{isOpen ? "Hide" : "Show"} Reports</span>}
-        {!isOpen && <span className="badge" style={{
+        {!isOpen && reports.length > 0 && <span className="badge" style={{
           background: "var(--accent)",
           color: "#000",
           padding: "0.15rem 0.5rem",
@@ -140,8 +138,8 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
         }}>{reports.length}</span>}
       </button>
 
-      {/* Overlay for mobile */}
-      {isOpen && isMobile && (
+      {/* Overlay backdrop - shown when sidebar is open */}
+      {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
           style={{
@@ -150,7 +148,7 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0, 0, 0, 0.6)",
+            background: isMobile ? "rgba(0, 0, 0, 0.6)" : "rgba(0, 0, 0, 0.3)",
             zIndex: 999,
             backdropFilter: "blur(2px)",
           }}
