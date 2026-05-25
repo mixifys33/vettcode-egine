@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { VettReport } from "@/lib/types";
 
-export default function AIAnalysisPage() {
+function AIAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [report, setReport] = useState<VettReport | null>(null);
@@ -35,13 +35,15 @@ export default function AIAnalysisPage() {
       }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ 
-            fontSize: "2rem", 
-            marginBottom: "1rem",
-            animation: "spin 1s linear infinite"
-          }}>
-            🤖
-          </div>
-          <p style={{ color: "var(--muted)" }}>Loading AI Analysis...</p>
+            width: "40px",
+            height: "40px",
+            border: "3px solid var(--border)",
+            borderTopColor: "var(--primary)",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+            margin: "0 auto 1rem"
+          }} />
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>Loading analysis data...</p>
         </div>
       </div>
     );
@@ -58,16 +60,15 @@ export default function AIAnalysisPage() {
         padding: "2rem"
       }}>
         <div style={{ textAlign: "center", maxWidth: "500px" }}>
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⚠️</div>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>No Report Found</h1>
-          <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
-            Please run a scan first to view AI analysis.
+          <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: 600 }}>No Report Available</h1>
+          <p style={{ color: "var(--muted)", marginBottom: "2rem", fontSize: "0.9rem" }}>
+            Run a security scan to generate AI analysis data.
           </p>
           <button
             onClick={() => router.push("/")}
             className="btn btn-primary"
           >
-            Go to Scanner
+            Return to Scanner
           </button>
         </div>
       </div>
@@ -164,15 +165,28 @@ export default function AIAnalysisPage() {
             display: "flex", 
             alignItems: "center", 
             gap: "1rem",
-            marginBottom: "1rem"
+            marginBottom: "0.5rem"
           }}>
-            <div style={{ fontSize: "3rem" }}>🤖</div>
+            <div style={{ 
+              width: "48px",
+              height: "48px",
+              background: "var(--primary)",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#fff"
+            }}>
+              AI
+            </div>
             <div>
-              <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-                AI Deep Analysis
+              <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "0.25rem" }}>
+                Deep Analysis Report
               </h1>
-              <p style={{ color: "var(--muted)", fontSize: "0.95rem" }}>
-                Complete detailed analysis from AI engine - no sugarcoating, just facts
+              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+                Comprehensive AI-powered security and quality assessment
               </p>
             </div>
           </div>
@@ -180,24 +194,12 @@ export default function AIAnalysisPage() {
 
         {/* AI Score Card */}
         <div style={{
-          background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05))",
-          border: "2px solid var(--primary)",
-          borderRadius: "12px",
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
           padding: "2rem",
-          marginBottom: "2rem",
-          position: "relative",
-          overflow: "hidden"
+          marginBottom: "2rem"
         }}>
-          <div style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            width: "150px",
-            height: "150px",
-            background: "radial-gradient(circle at top right, rgba(99, 102, 241, 0.2), transparent)",
-            pointerEvents: "none"
-          }} />
-
           <div style={{ 
             display: "grid", 
             gridTemplateColumns: "auto 1fr",
@@ -206,18 +208,18 @@ export default function AIAnalysisPage() {
           }}>
             {/* Score Ring */}
             <div style={{
-              width: "150px",
-              height: "150px",
+              width: "140px",
+              height: "140px",
               borderRadius: "50%",
-              border: `8px solid ${getScoreColor(aiScore)}`,
+              border: `6px solid ${getScoreColor(aiScore)}`,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(0, 0, 0, 0.3)"
+              background: "var(--bg)"
             }}>
               <div style={{ 
-                fontSize: "3rem", 
+                fontSize: "2.5rem", 
                 fontWeight: 700, 
                 color: getScoreColor(aiScore),
                 lineHeight: 1
@@ -225,77 +227,77 @@ export default function AIAnalysisPage() {
                 {aiScore}
               </div>
               <div style={{ 
-                fontSize: "1.2rem", 
+                fontSize: "1rem", 
                 fontWeight: 600, 
-                color: getScoreColor(aiScore),
+                color: "var(--muted)",
                 marginTop: "0.25rem"
               }}>
-                {getScoreGrade(aiScore)}
+                Grade {getScoreGrade(aiScore)}
               </div>
             </div>
 
             {/* Score Details */}
             <div>
               <h2 style={{ 
-                fontSize: "1.5rem", 
-                fontWeight: 700, 
+                fontSize: "1.25rem", 
+                fontWeight: 600, 
                 marginBottom: "0.5rem",
                 color: "var(--text)"
               }}>
-                AI Quality Score
+                AI Quality Assessment
               </h2>
               <p style={{ 
-                fontSize: "1rem", 
+                fontSize: "0.95rem", 
                 color: "var(--muted)", 
-                marginBottom: "1rem" 
+                marginBottom: "1.5rem",
+                lineHeight: "1.5"
               }}>
                 {getAIVerdict(aiScore)}
               </p>
               
               <div style={{ 
-                display: "flex", 
-                gap: "1rem", 
-                flexWrap: "wrap",
-                marginTop: "1rem"
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "1rem"
               }}>
                 <div style={{
-                  background: "rgba(0, 0, 0, 0.3)",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(99, 102, 241, 0.3)"
+                  background: "var(--bg)",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)"
                 }}>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--primary)" }}>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>
                     {aiFindings.length}
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                    Total AI Findings
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                    Total Findings
                   </div>
                 </div>
                 
                 <div style={{
-                  background: "rgba(0, 0, 0, 0.3)",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(34, 211, 165, 0.3)"
+                  background: "var(--bg)",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)"
                 }}>
                   <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent)" }}>
                     {verifiedFindings.length}
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                    Verified by Both
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                    Verified
                   </div>
                 </div>
                 
                 <div style={{
-                  background: "rgba(0, 0, 0, 0.3)",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(139, 92, 246, 0.3)"
+                  background: "var(--bg)",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)"
                 }}>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#8b5cf6" }}>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--primary)" }}>
                     {aiOnlyFindings.length}
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
                     AI Only
                   </div>
                 </div>
@@ -332,22 +334,21 @@ export default function AIAnalysisPage() {
         {/* AI Findings - Full Details */}
         <div>
           <h2 style={{ 
-            fontSize: "1.5rem", 
-            fontWeight: 700, 
+            fontSize: "1.25rem", 
+            fontWeight: 600, 
             marginBottom: "1rem",
             color: "var(--text)"
           }}>
-            Complete AI Findings ({aiFindings.length})
+            Detailed Findings ({aiFindings.length})
           </h2>
 
           {aiFindings.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
-              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✨</div>
-              <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                No AI Findings
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                No Issues Detected
               </h3>
-              <p style={{ color: "var(--muted)" }}>
-                AI analysis found no issues in your codebase. Excellent work!
+              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+                AI analysis found no security or quality issues in the scanned codebase.
               </p>
             </div>
           ) : (
@@ -363,12 +364,13 @@ export default function AIAnalysisPage() {
                     position: "absolute",
                     top: "1rem",
                     right: "1rem",
-                    background: "rgba(0, 0, 0, 0.5)",
+                    background: "var(--bg-secondary)",
                     padding: "0.25rem 0.75rem",
-                    borderRadius: "999px",
+                    borderRadius: "4px",
                     fontSize: "0.75rem",
                     fontWeight: 600,
-                    color: "var(--muted)"
+                    color: "var(--muted)",
+                    border: "1px solid var(--border)"
                   }}>
                     #{index + 1}
                   </div>
@@ -381,23 +383,27 @@ export default function AIAnalysisPage() {
                         background: "var(--accent)",
                         color: "#06080d",
                         padding: "0.25rem 0.75rem",
-                        borderRadius: "999px",
-                        fontSize: "0.75rem",
-                        fontWeight: 600
+                        borderRadius: "4px",
+                        fontSize: "0.7rem",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px"
                       }}>
-                        ✓ VERIFIED
+                        Verified
                       </span>
                     )}
                     {finding.source === "ai" && (
                       <span style={{
-                        background: "#8b5cf6",
+                        background: "var(--primary)",
                         color: "#fff",
                         padding: "0.25rem 0.75rem",
-                        borderRadius: "999px",
-                        fontSize: "0.75rem",
-                        fontWeight: 600
+                        borderRadius: "4px",
+                        fontSize: "0.7rem",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px"
                       }}>
-                        🤖 AI ONLY
+                        AI
                       </span>
                     )}
                     {finding.file && (
@@ -410,7 +416,7 @@ export default function AIAnalysisPage() {
 
                   <h3 className="finding-title">{finding.title}</h3>
                   
-                  <p style={{ fontSize: "0.95rem", color: "var(--text)", marginBottom: "1rem", lineHeight: "1.6" }}>
+                  <p style={{ fontSize: "0.9rem", color: "var(--text)", marginBottom: "1rem", lineHeight: "1.6" }}>
                     {finding.description}
                   </p>
 
@@ -422,12 +428,12 @@ export default function AIAnalysisPage() {
                   )}
 
                   <div className="finding-section">
-                    <strong>How to Fix</strong>
+                    <strong>Remediation</strong>
                     <p>{finding.mitigation}</p>
                   </div>
 
                   <div className="finding-section">
-                    <strong>Prevention Strategy</strong>
+                    <strong>Prevention</strong>
                     <p>{finding.prevention}</p>
                   </div>
                 </article>
@@ -439,22 +445,51 @@ export default function AIAnalysisPage() {
         {/* Footer Info */}
         <div style={{
           marginTop: "3rem",
-          padding: "1.5rem",
-          background: "rgba(99, 102, 241, 0.1)",
-          border: "1px solid rgba(99, 102, 241, 0.3)",
-          borderRadius: "8px",
-          borderLeft: "4px solid var(--primary)"
+          padding: "1.25rem",
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          borderLeft: "3px solid var(--primary)"
         }}>
-          <h4 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem", color: "var(--primary)" }}>
-            💡 About AI Analysis
+          <h4 style={{ fontSize: "0.95rem", fontWeight: 600, marginBottom: "0.5rem", color: "var(--text)" }}>
+            Analysis Methodology
           </h4>
-          <p style={{ fontSize: "0.9rem", color: "var(--muted)", lineHeight: "1.6" }}>
-            Our AI examines your code's context, understands business logic, traces data flow, and identifies 
-            subtle vulnerabilities that pattern-based scanners miss. The AI score is calculated based on the 
-            severity and quantity of issues found, with no sugarcoating - just honest assessment.
+          <p style={{ fontSize: "0.85rem", color: "var(--muted)", lineHeight: "1.6" }}>
+            This analysis uses advanced AI models to examine code context, business logic, data flow patterns, 
+            and security vulnerabilities. Findings are scored based on severity and impact, with verified issues 
+            confirmed by both static analysis and AI detection.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AIAnalysisPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        background: "var(--bg)"
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ 
+            width: "40px",
+            height: "40px",
+            border: "3px solid var(--border)",
+            borderTopColor: "var(--primary)",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+            margin: "0 auto 1rem"
+          }} />
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>Loading...</p>
+        </div>
+      </div>
+    }>
+      <AIAnalysisContent />
+    </Suspense>
   );
 }

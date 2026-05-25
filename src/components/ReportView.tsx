@@ -888,22 +888,11 @@ export function ReportView({
         return (
           <div style={{
             marginBottom: "1.5rem",
-            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05))",
-            border: "2px solid var(--primary)",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            position: "relative",
-            overflow: "hidden"
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "1.5rem"
           }}>
-            <div style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              width: "120px",
-              height: "120px",
-              background: "radial-gradient(circle at top right, rgba(99, 102, 241, 0.2), transparent)",
-              pointerEvents: "none"
-            }} />
             
             <div style={{
               display: "flex",
@@ -912,8 +901,20 @@ export function ReportView({
               marginBottom: "1rem",
               flexWrap: "wrap"
             }}>
-              <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
-                🤖
+              <div style={{ 
+                width: "40px",
+                height: "40px",
+                background: "var(--primary)",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.2rem",
+                fontWeight: 700,
+                color: "#fff",
+                flexShrink: 0
+              }}>
+                AI
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <div style={{
@@ -924,12 +925,12 @@ export function ReportView({
                   flexWrap: "wrap"
                 }}>
                   <h3 style={{
-                    fontSize: "1.25rem",
-                    fontWeight: 700,
-                    color: "var(--primary)",
+                    fontSize: "1.1rem",
+                    fontWeight: 600,
+                    color: "var(--text)",
                     margin: 0
                   }}>
-                    AI Deep Analysis
+                    Deep Analysis
                   </h3>
                   
                   {/* AI Score Badge */}
@@ -937,50 +938,46 @@ export function ReportView({
                     display: "flex",
                     alignItems: "center",
                     gap: "0.5rem",
-                    background: "rgba(0, 0, 0, 0.3)",
-                    padding: "0.5rem 1rem",
-                    borderRadius: "999px",
-                    border: `2px solid ${getScoreColor(aiScore)}`
+                    background: "var(--bg)",
+                    padding: "0.4rem 0.9rem",
+                    borderRadius: "4px",
+                    border: `1px solid ${getScoreColor(aiScore)}`
                   }}>
                     <span style={{
-                      fontSize: "1.2rem",
+                      fontSize: "1.1rem",
                       fontWeight: 700,
                       color: getScoreColor(aiScore)
                     }}>
                       {aiScore}
                     </span>
                     <span style={{
-                      fontSize: "0.9rem",
+                      fontSize: "0.85rem",
                       fontWeight: 600,
-                      color: getScoreColor(aiScore)
-                    }}>
-                      {getScoreGrade(aiScore)}
-                    </span>
-                    <span style={{
-                      fontSize: "0.75rem",
                       color: "var(--muted)"
                     }}>
-                      AI Score
+                      Grade {getScoreGrade(aiScore)}
                     </span>
                   </div>
                   
                   <span style={{
-                    background: "var(--primary)",
-                    color: "#fff",
-                    padding: "0.25rem 0.75rem",
-                    borderRadius: "999px",
-                    fontSize: "0.85rem",
-                    fontWeight: 600
+                    background: "var(--bg)",
+                    color: "var(--text)",
+                    padding: "0.4rem 0.9rem",
+                    borderRadius: "4px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    border: "1px solid var(--border)"
                   }}>
                     {aiFindings.length} findings
                   </span>
                 </div>
                 <p style={{
-                  fontSize: "0.9rem",
+                  fontSize: "0.85rem",
                   color: "var(--muted)",
-                  marginBottom: "1rem"
+                  marginBottom: "1rem",
+                  lineHeight: "1.5"
                 }}>
-                  Advanced AI analysis discovered these issues by understanding your application's context, logic flow, and security patterns.
+                  Advanced analysis using context-aware AI models to identify security vulnerabilities and code quality issues.
                 </p>
               </div>
             </div>
