@@ -147,6 +147,8 @@ export function ReportView({
   const [showAllFindings, setShowAllFindings] = useState(false);
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
   const [showFileTree, setShowFileTree] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   
   const sorted = [...report.findings].sort((a, b) => {
     const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -237,6 +239,103 @@ export function ReportView({
     a.download = `vettcode-file-tree-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+  
+  // Handle monetize/pre-list submission
+  const handleMonetize = async () => {
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      // Check if user is authenticated (check for seller token)
+      const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
+      
+      if (!token) {
+        // Redirect to seller login/register page
+        window.location.href = "https://vettcodedev.vercel.app/login";
+        return;
+      }
+
+      // Prepare submission data
+      const submissionData = {
+        projectName: report.metadata?.projectName || "Untitled Project",
+        projectDescription: report.summary || "",
+        vettScore: report.score,
+        vettGrade: report.grade,
+        executiveVerdict: report.executiveVerdict,
+        scanReport: JSON.stringify(report),
+        languages: extractLanguages(report),
+        frameworks: extractFrameworks(report),
+        hasTests: report.strengths?.some(s => s.toLowerCase().includes("test")) || false,
+        hasDocumentation: report.strengths?.some(s => s.toLowerCase().includes("documentation")) || false,
+      };
+
+      // Submit to backend
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
+      const response = await fetch(`${backendUrl}/api/pre-listed-code/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to pre-list code");
+      }
+
+      // Redirect to success page
+      const params = new URLSearchParams({
+        projectName: data.data.projectName,
+        vettScore: data.data.vettScore.toString(),
+        vettGrade: data.data.vettGrade,
+        email: "", // Will be fetched from seller profile
+      });
+
+      window.location.href = `/pre-list-success?${params.toString()}`;
+    } catch (error: any) {
+      console.error("Monetization error:", error);
+      setSubmitError(error.message || "Failed to pre-list code. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Helper: Extract languages from report
+  const extractLanguages = (report: VettReport): string[] => {
+    const languages = new Set<string>();
+    report.findings.forEach((finding) => {
+      if (finding.language) languages.add(finding.language);
+    });
+    return Array.from(languages);
+  };
+
+  // Helper: Extract frameworks from report
+  const extractFrameworks = (report: VettReport): string[] => {
+    const frameworks = new Set<string>();
+    const codeText = report.findings.map(f => f.evidence?.toLowerCase() || "").join(" ");
+    
+    const frameworkPatterns = [
+      { name: "React", pattern: /react/i },
+      { name: "Next.js", pattern: /next/i },
+      { name: "Vue", pattern: /vue/i },
+      { name: "Angular", pattern: /angular/i },
+      { name: "Express", pattern: /express/i },
+      { name: "Django", pattern: /django/i },
+      { name: "Flask", pattern: /flask/i },
+      { name: "Laravel", pattern: /laravel/i },
+      { name: "Spring", pattern: /spring/i },
+      { name: "Node.js", pattern: /node/i },
+    ];
+
+    frameworkPatterns.forEach(({ name, pattern }) => {
+      if (pattern.test(codeText)) frameworks.add(name);
+    });
+
+    return Array.from(frameworks);
   };
 
   return (
@@ -715,8 +814,8 @@ export function ReportView({
         </>
       )}
 
-      {/* Monetize on VETTCODE Section */}
-      {report.score >= 50 && (
+      {/* Monetize on VETTCODE Section - Score >= 60 */}
+      {report.score >= 60 && (
         <div style={{
           marginTop: "1.5rem",
           padding: "1.5rem",
@@ -800,10 +899,23 @@ export function ReportView({
             </ul>
           </div>
           
-          <a
-            href="https://vettcodedev.vercel.app"
-            target="_blank"
-            rel="noopener noreferrer"
+          {submitError && (
+            <div style={{
+              marginBottom: "1rem",
+              padding: "0.75rem 1rem",
+              background: "rgba(244, 63, 94, 0.1)",
+              border: "1px solid var(--danger)",
+              borderRadius: "8px",
+              color: "var(--danger)",
+              fontSize: "0.9rem"
+            }}>
+              {submitError}
+            </div>
+          )}
+          
+          <button
+            onClick={handleMonetize}
+            disabled={isSubmitting}
             style={{
               display: "block",
               width: "100%",
@@ -811,26 +923,47 @@ export function ReportView({
               fontSize: "1rem",
               fontWeight: 700,
               textAlign: "center",
-              background: "linear-gradient(135deg, var(--accent), #14b88a)",
+              background: isSubmitting 
+                ? "var(--muted)" 
+                : "linear-gradient(135deg, var(--accent), #14b88a)",
               color: "#06080d",
               border: "none",
               borderRadius: "8px",
-              cursor: "pointer",
+              cursor: isSubmitting ? "not-allowed" : "pointer",
               transition: "all 0.2s ease",
-              textDecoration: "none",
-              boxShadow: "0 4px 12px rgba(34, 211, 165, 0.3)"
+              boxShadow: "0 4px 12px rgba(34, 211, 165, 0.3)",
+              opacity: isSubmitting ? 0.6 : 1
             }}
             onMouseEnter={(e: any) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 6px 16px rgba(34, 211, 165, 0.4)";
+              if (!isSubmitting) {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(34, 211, 165, 0.4)";
+              }
             }}
             onMouseLeave={(e: any) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 211, 165, 0.3)";
+              if (!isSubmitting) {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 211, 165, 0.3)";
+              }
             }}
           >
-            🚀 Start Earning from Your Code on VETTCODE
-          </a>
+            {isSubmitting ? (
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                <span style={{ 
+                  display: "inline-block",
+                  width: "16px",
+                  height: "16px",
+                  border: "2px solid #06080d",
+                  borderTopColor: "transparent",
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite"
+                }} />
+                Pre-Listing Your Code...
+              </span>
+            ) : (
+              "🚀 Start Earning from Your Code on VETTCODE"
+            )}
+          </button>
           
           <p style={{
             marginTop: "0.75rem",
@@ -840,6 +973,111 @@ export function ReportView({
           }}>
             Free to pre-list • No commitment • Set your price later
           </p>
+        </div>
+      )}
+
+      {/* Missing Out Section - Score < 60 */}
+      {report.score < 60 && (
+        <div style={{
+          marginTop: "1.5rem",
+          padding: "1.5rem",
+          background: "linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))",
+          border: "2px solid var(--warning)",
+          borderRadius: "12px",
+          position: "relative",
+          overflow: "hidden"
+        }}>
+          <div style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: "120px",
+            height: "120px",
+            background: "radial-gradient(circle at top right, rgba(251, 191, 36, 0.2), transparent)",
+            pointerEvents: "none"
+          }} />
+          
+          <div style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "1rem",
+            marginBottom: "1rem",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
+              ⚠️
+            </div>
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <h3 style={{
+                fontSize: "1.25rem",
+                fontWeight: 700,
+                marginBottom: "0.5rem",
+                color: "var(--warning)"
+              }}>
+                You're Missing Out on Earning Potential!
+              </h3>
+              <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
+                Your code scored <span style={{ fontWeight: 700, color: "var(--warning)" }}>{report.grade} ({report.score}/100)</span>. 
+                To monetize on VETTCODE, you need a minimum score of <span style={{ fontWeight: 700, color: "var(--accent)" }}>60/100</span>.
+              </p>
+            </div>
+          </div>
+          
+          <div style={{
+            background: "rgba(0, 0, 0, 0.2)",
+            borderRadius: "8px",
+            padding: "1rem",
+            marginBottom: "1rem",
+            border: "1px solid rgba(251, 191, 36, 0.3)"
+          }}>
+            <p style={{ 
+              fontSize: "0.9rem", 
+              fontWeight: 600, 
+              marginBottom: "0.75rem",
+              color: "var(--text)"
+            }}>
+              🎯 How to Reach 60+ Score:
+            </p>
+            <ul style={{ 
+              listStyle: "none", 
+              padding: 0, 
+              margin: 0,
+              fontSize: "0.9rem",
+              lineHeight: "1.8"
+            }}>
+              {[
+                { icon: "🔴", text: `Fix ${report.criticalBlockers.length} critical blocker${report.criticalBlockers.length !== 1 ? 's' : ''} (highest priority!)` },
+                { icon: "🟠", text: "Address high-severity security vulnerabilities" },
+                { icon: "🟡", text: "Improve error handling and input validation" },
+                { icon: "🟢", text: "Add tests and documentation for better quality" }
+              ].map((item, idx) => (
+                <li key={idx} style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "0.75rem",
+                  marginBottom: idx < 3 ? "0.5rem" : "0"
+                }}>
+                  <span style={{ flexShrink: 0 }}>
+                    {item.icon}
+                  </span>
+                  <span style={{ color: "var(--text)" }}>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          <div style={{
+            padding: "0.75rem 1rem",
+            background: "rgba(34, 211, 165, 0.1)",
+            border: "1px solid var(--accent)",
+            borderRadius: "8px",
+            fontSize: "0.85rem",
+            color: "var(--text)",
+            borderLeft: "3px solid var(--accent)"
+          }}>
+            💡 <strong style={{ color: "var(--accent)" }}>Good News:</strong> You're only {60 - report.score} points away! 
+            Fix the issues above, rescan your code, and start earning from VETTCODE.
+          </div>
         </div>
       )}
 

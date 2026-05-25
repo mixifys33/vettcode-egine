@@ -58,9 +58,18 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState(getAuthUser());
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setUser(getAuthUser());
+    
+    // Check if desktop to auto-open sidebar
+    const checkDesktop = () => {
+      if (window.innerWidth >= 768 && isAuthenticated()) {
+        setSidebarOpen(true);
+      }
+    };
+    checkDesktop();
   }, [showAuthModal]);
 
   function handleLogout() {
@@ -153,7 +162,13 @@ export default function Home() {
   const scanQuota = canScan();
 
   return (
-    <main className="container" style={{ paddingLeft: isAuthenticated() ? "340px" : "0" }}>
+    <main 
+      className="container" 
+      style={{ 
+        paddingLeft: isAuthenticated() && sidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 768 ? "340px" : "0",
+        transition: "padding-left 0.3s ease"
+      }}
+    >
       {/* Reports History Sidebar */}
       {isAuthenticated() && (
         <ReportsHistory

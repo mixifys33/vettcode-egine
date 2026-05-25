@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { BarChart3, Edit2, Trash2, X, Menu, Clock, FileText } from "lucide-react";
 import type { SavedReport } from "@/lib/report-storage";
 import { getSavedReports, deleteReport, updateReportName } from "@/lib/report-storage";
 import { isAuthenticated } from "@/lib/auth";
@@ -16,11 +17,26 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated()) {
       loadReports();
     }
+    
+    // Check screen size
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Auto-open on desktop, closed on mobile
+      if (!mobile) {
+        setIsOpen(true);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadReports = () => {
@@ -81,87 +97,119 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
 
   return (
     <>
-      {/* Mobile Toggle Button */}
+      {/* Toggle Button - Always visible */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
           position: "fixed",
           top: "1rem",
-          left: "1rem",
-          zIndex: 1001,
-          padding: "0.5rem 1rem",
-          background: "var(--bg-secondary)",
+          left: isOpen && !isMobile ? "340px" : "1rem",
+          zIndex: 1002,
+          padding: "0.75rem",
+          background: "var(--bg-elevated)",
           border: "1px solid var(--border)",
-          borderRadius: "6px",
+          borderRadius: "8px",
           cursor: "pointer",
-          display: "none",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          color: "var(--text)",
+          fontSize: "0.9rem",
+          fontWeight: 500,
+          transition: "all 0.3s ease",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
         }}
-        className="mobile-reports-toggle"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--surface)";
+          e.currentTarget.style.borderColor = "var(--accent)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "var(--bg-elevated)";
+          e.currentTarget.style.borderColor = "var(--border)";
+        }}
       >
-        📊 Reports ({reports.length})
+        {isOpen ? <X size={18} /> : <Menu size={18} />}
+        {!isMobile && <span>{isOpen ? "Hide" : "Show"} Reports</span>}
+        {!isOpen && <span className="badge" style={{
+          background: "var(--accent)",
+          color: "#000",
+          padding: "0.15rem 0.5rem",
+          borderRadius: "12px",
+          fontSize: "0.75rem",
+          fontWeight: "bold"
+        }}>{reports.length}</span>}
       </button>
+
+      {/* Overlay for mobile */}
+      {isOpen && isMobile && (
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.6)",
+            zIndex: 999,
+            backdropFilter: "blur(2px)",
+          }}
+        />
+      )}
 
       {/* Sidebar */}
       <div
         style={{
           position: "fixed",
           top: 0,
-          left: isOpen ? 0 : "-320px",
+          left: isOpen ? 0 : "-340px",
           width: "320px",
           height: "100vh",
-          background: "var(--bg)",
+          background: "var(--bg-elevated)",
           borderRight: "1px solid var(--border)",
           overflowY: "auto",
           zIndex: 1000,
           transition: "left 0.3s ease",
           padding: "1rem",
+          boxShadow: isOpen ? "4px 0 12px rgba(0,0,0,0.3)" : "none",
         }}
-        className="reports-sidebar"
       >
         <div style={{ 
           display: "flex", 
           justifyContent: "space-between", 
           alignItems: "center",
-          marginBottom: "1rem"
+          marginBottom: "1rem",
+          paddingTop: "3.5rem"
         }}>
-          <h3 style={{ margin: 0, fontSize: "1.1rem" }}>
-            📊 Saved Reports
-          </h3>
-          {onClose && (
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onClose();
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                fontSize: "1.5rem",
-                cursor: "pointer",
-                color: "var(--muted)",
-              }}
-            >
-              ×
-            </button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <BarChart3 size={20} color="var(--accent)" />
+            <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
+              Saved Reports
+            </h3>
+          </div>
         </div>
 
         <p style={{ 
           fontSize: "0.85rem", 
           color: "var(--muted)",
-          marginBottom: "1rem"
+          marginBottom: "1rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem"
         }}>
+          <FileText size={14} />
           {reports.length} of 50 reports saved
         </p>
 
         {reports.length === 0 ? (
           <div style={{
             textAlign: "center",
-            padding: "2rem 1rem",
+            padding: "3rem 1rem",
             color: "var(--muted)",
             fontSize: "0.9rem"
           }}>
-            <p>No saved reports yet.</p>
+            <BarChart3 size={48} style={{ margin: "0 auto 1rem", opacity: 0.3 }} />
+            <p style={{ fontWeight: 500 }}>No saved reports yet.</p>
             <p style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
               Scan a project to save your first report!
             </p>
@@ -173,24 +221,26 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
                 key={report.id}
                 onClick={() => {
                   onSelectReport(report);
-                  setIsOpen(false);
+                  if (isMobile) setIsOpen(false);
                 }}
                 style={{
                   padding: "0.75rem",
-                  background: currentReportId === report.id ? "var(--bg-secondary)" : "transparent",
+                  background: currentReportId === report.id ? "var(--surface)" : "transparent",
                   border: `1px solid ${currentReportId === report.id ? "var(--accent)" : "var(--border)"}`,
-                  borderRadius: "6px",
+                  borderRadius: "8px",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
                 }}
                 onMouseEnter={(e) => {
                   if (currentReportId !== report.id) {
-                    e.currentTarget.style.background = "var(--bg-secondary)";
+                    e.currentTarget.style.background = "var(--surface)";
+                    e.currentTarget.style.borderColor = "var(--border-focus)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (currentReportId !== report.id) {
                     e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.borderColor = "var(--border)";
                   }
                 }}
               >
@@ -208,139 +258,136 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
                     autoFocus
                     style={{
                       width: "100%",
-                      padding: "0.25rem 0.5rem",
+                      padding: "0.5rem",
                       background: "var(--bg)",
                       border: "1px solid var(--accent)",
-                      borderRadius: "4px",
+                      borderRadius: "6px",
                       color: "var(--text)",
                       fontSize: "0.9rem",
+                      outline: "none",
                     }}
                   />
                 ) : (
-                  <div style={{ 
-                    display: "flex", 
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: "0.5rem"
-                  }}>
-                    <h4 style={{ 
-                      margin: 0, 
-                      fontSize: "0.9rem",
-                      fontWeight: 500,
-                      flex: 1,
-                      wordBreak: "break-word"
-                    }}>
-                      {report.projectName}
-                    </h4>
+                  <>
                     <div style={{ 
                       display: "flex", 
-                      gap: "0.25rem",
-                      marginLeft: "0.5rem"
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "0.5rem"
                     }}>
-                      <button
-                        onClick={(e) => handleRename(report.id, e)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "0.9rem",
-                          padding: "0.25rem",
-                          color: "var(--muted)",
-                        }}
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(report.id, e)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "0.9rem",
-                          padding: "0.25rem",
-                          color: "var(--danger)",
-                        }}
-                        title="Delete"
-                      >
-                        🗑️
-                      </button>
+                      <h4 style={{ 
+                        margin: 0, 
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        flex: 1,
+                        wordBreak: "break-word"
+                      }}>
+                        {report.projectName}
+                      </h4>
+                      <div style={{ 
+                        display: "flex", 
+                        gap: "0.25rem",
+                        marginLeft: "0.5rem"
+                      }}>
+                        <button
+                          onClick={(e) => handleRename(report.id, e)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0.25rem",
+                            color: "var(--muted)",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "4px",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "var(--surface2)";
+                            e.currentTarget.style.color = "var(--accent)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "var(--muted)";
+                          }}
+                          title="Rename"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(report.id, e)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0.25rem",
+                            color: "var(--muted)",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "4px",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "var(--surface2)";
+                            e.currentTarget.style.color = "var(--danger)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "var(--muted)";
+                          }}
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
 
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  marginBottom: "0.25rem"
-                }}>
-                  <div style={{
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "50%",
-                    border: `3px solid ${getScoreColor(report.report.score)}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.85rem",
-                    fontWeight: "bold",
-                    color: getScoreColor(report.report.score),
-                  }}>
-                    {report.report.score}
-                  </div>
-                  <div style={{ flex: 1 }}>
                     <div style={{ 
-                      fontSize: "0.75rem", 
-                      color: "var(--muted)",
-                      marginBottom: "0.15rem"
+                      display: "flex", 
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "0.5rem"
                     }}>
-                      {report.report.findings.length} findings · {report.scanMode}
+                      <div style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "50%",
+                        border: `3px solid ${getScoreColor(report.report.score)}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.85rem",
+                        fontWeight: "bold",
+                        color: getScoreColor(report.report.score),
+                        flexShrink: 0,
+                      }}>
+                        {report.report.score}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ 
+                          fontSize: "0.75rem", 
+                          color: "var(--muted)",
+                          marginBottom: "0.25rem"
+                        }}>
+                          {report.report.findings.length} findings · {report.scanMode}
+                        </div>
+                        <div style={{ 
+                          fontSize: "0.7rem", 
+                          color: "var(--muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem"
+                        }}>
+                          <Clock size={10} />
+                          {formatDate(report.savedAt)}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
-                      {formatDate(report.savedAt)}
-                    </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            zIndex: 999,
-            display: "none",
-          }}
-          className="reports-overlay"
-        />
-      )}
-
-      <style jsx>{`
-        @media (max-width: 768px) {
-          .mobile-reports-toggle {
-            display: block !important;
-          }
-          .reports-overlay {
-            display: block !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .reports-sidebar {
-            left: 0 !important;
-          }
-        }
-      `}</style>
     </>
   );
 }
