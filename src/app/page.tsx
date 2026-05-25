@@ -20,6 +20,15 @@ import {
 import { saveReport, type SavedReport } from "@/lib/report-storage";
 import type { VettReport } from "@/lib/types";
 
+// Sanitize project name to prevent potential issues
+function sanitizeProjectName(name: string): string {
+  return name
+    .replace(/[<>\"'`]/g, '') // Remove potential HTML/script chars
+    .replace(/[\/\\]/g, '-') // Replace path separators
+    .trim()
+    .slice(0, 100); // Limit length
+}
+
 function PrivacyBanner() {
   return (
     <aside className="privacy-banner">
@@ -297,8 +306,10 @@ export default function Home() {
               type="text"
               className="field-input"
               value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
+              onChange={(e) => setProjectName(sanitizeProjectName(e.target.value))}
               disabled={scanning}
+              placeholder="my-project"
+              maxLength={100}
             />
           </div>
 

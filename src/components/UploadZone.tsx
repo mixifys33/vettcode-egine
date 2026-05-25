@@ -2,6 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 
+// File size limits (must match server-side limits in file-collector.ts)
+const MAX_ZIP_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_ZIP_SIZE_MB = 50;
+
 interface UploadZoneProps {
   disabled?: boolean;
   onFolderSelect: (files: FileList) => void;
@@ -29,6 +33,11 @@ export function UploadZone({
           if (item.kind === "file") {
             const file = item.getAsFile();
             if (file?.name.endsWith(".zip")) {
+              // Validate file size
+              if (file.size > MAX_ZIP_SIZE) {
+                alert(`File too large. Maximum size is ${MAX_ZIP_SIZE_MB}MB. Your file is ${Math.round(file.size / 1024 / 1024)}MB.`);
+                return;
+              }
               onZipSelect(file);
               return;
             }
@@ -39,7 +48,14 @@ export function UploadZone({
       const files = e.dataTransfer.files;
       if (files.length) {
         const zip = Array.from(files).find((f) => f.name.endsWith(".zip"));
-        if (zip) onZipSelect(zip);
+        if (zip) {
+          // Validate file size
+          if (zip.size > MAX_ZIP_SIZE) {
+            alert(`File too large. Maximum size is ${MAX_ZIP_SIZE_MB}MB. Your file is ${Math.round(zip.size / 1024 / 1024)}MB.`);
+            return;
+          }
+          onZipSelect(zip);
+        }
       }
     },
     [disabled, onZipSelect]
@@ -99,7 +115,15 @@ export function UploadZone({
         accept=".zip,application/zip"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onZipSelect(file);
+          if (file) {
+            // Validate file size
+            if (file.size > MAX_ZIP_SIZE) {
+              alert(`File too large. Maximum size is ${MAX_ZIP_SIZE_MB}MB. Your file is ${Math.round(file.size / 1024 / 1024)}MB.`);
+              e.target.value = "";
+              return;
+            }
+            onZipSelect(file);
+          }
           e.target.value = "";
         }}
       />

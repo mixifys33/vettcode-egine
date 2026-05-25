@@ -18,12 +18,12 @@ export function getApiKeys(): string[] {
     if (k?.trim()) keys.push(k.trim());
   }
   
-  // Debug logging (remove after testing)
+  // Debug logging (only in development or when keys are missing)
   if (keys.length === 0) {
     console.error('[OpenRouter] No API keys found! Check environment variables.');
     console.error('[OpenRouter] OPENROUTER_API_KEYS:', process.env.OPENROUTER_API_KEYS ? 'SET' : 'NOT SET');
     console.error('[OpenRouter] OPENROUTER_API_KEY_1:', process.env.OPENROUTER_API_KEY_1 ? 'SET' : 'NOT SET');
-  } else {
+  } else if (process.env.NODE_ENV === 'development') {
     console.log(`[OpenRouter] Found ${keys.length} API key(s)`);
   }
   
@@ -97,9 +97,11 @@ export async function chatCompletion(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      console.log(`[OpenRouter] Attempt ${attempt + 1}/${retries + 1} - Calling ${OPENROUTER_URL}`);
-      console.log(`[OpenRouter] Models: ${JSON.stringify(models)}`);
-      console.log(`[OpenRouter] Message count: ${messages.length}, Total chars: ${messages.reduce((sum, m) => sum + m.content.length, 0)}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[OpenRouter] Attempt ${attempt + 1}/${retries + 1} - Calling ${OPENROUTER_URL}`);
+        console.log(`[OpenRouter] Models: ${JSON.stringify(models)}`);
+        console.log(`[OpenRouter] Message count: ${messages.length}, Total chars: ${messages.reduce((sum, m) => sum + m.content.length, 0)}`);
+      }
       
       const res = await fetch(OPENROUTER_URL, {
         method: "POST",
@@ -112,7 +114,9 @@ export async function chatCompletion(
         body: JSON.stringify(body),
       });
 
-      console.log(`[OpenRouter] Response status: ${res.status}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[OpenRouter] Response status: ${res.status}`);
+      }
 
       if (!res.ok) {
         const errText = await res.text();
@@ -137,8 +141,10 @@ export async function chatCompletion(
 
       const content = data.choices?.[0]?.message?.content?.trim();
       
-      console.log(`[OpenRouter] Response model: ${data.model || 'unknown'}`);
-      console.log(`[OpenRouter] Content length: ${content?.length || 0} chars`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[OpenRouter] Response model: ${data.model || 'unknown'}`);
+        console.log(`[OpenRouter] Content length: ${content?.length || 0} chars`);
+      }
       
       if (!content) {
         if (attempt < retries) {
@@ -149,7 +155,9 @@ export async function chatCompletion(
         throw new Error("Empty response from OpenRouter after retries");
       }
 
-      console.log(`[OpenRouter] ✓ Success on attempt ${attempt + 1}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[OpenRouter] ✓ Success on attempt ${attempt + 1}`);
+      }
       return { content, model: data.model ?? models[0] };
     } catch (error) {
       if (attempt === retries) {
