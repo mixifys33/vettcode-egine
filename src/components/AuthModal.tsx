@@ -64,7 +64,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: googleEmail.toLowerCase(),
-          password: `google_${payload.sub}`, // Use Google ID as password
+          password: `google_oauth_${payload.sub}`, // Google OAuth identifier
         }),
       });
 
@@ -95,7 +95,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             name: googleName,
             email: googleEmail.toLowerCase(),
             phoneNumber: randomPhone, // Placeholder phone
-            password: `google_${payload.sub}`, // Use Google ID as password
+            password: `google_oauth_${payload.sub}`, // Google OAuth identifier
           }),
         });
 

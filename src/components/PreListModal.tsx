@@ -158,6 +158,22 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
       return;
     }
 
+    // Validate file sizes (max 5MB per image)
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+    const oversizedFiles = files.filter(file => file.size > MAX_IMAGE_SIZE);
+    if (oversizedFiles.length > 0) {
+      setError(`Image too large. Maximum size is 5MB per image. Found: ${oversizedFiles.map(f => `${f.name} (${Math.round(f.size / 1024 / 1024)}MB)`).join(', ')}`);
+      return;
+    }
+
+    // Validate file types
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const invalidFiles = files.filter(file => !validTypes.includes(file.type));
+    if (invalidFiles.length > 0) {
+      setError(`Invalid file type. Only JPG, PNG, WebP, and GIF images are allowed.`);
+      return;
+    }
+
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
 
     // Generate previews

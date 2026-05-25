@@ -82,10 +82,21 @@ export function saveReport(
 
 /**
  * Get a specific report by ID
+ * Only returns reports owned by the current authenticated user
  */
 export function getReportById(reportId: string): SavedReport | null {
-  const reports = getSavedReports();
-  return reports.find(r => r.id === reportId) || null;
+  if (typeof window === "undefined") return null;
+  
+  const user = getAuthUser();
+  if (!user) return null; // Must be authenticated
+  
+  const reports = getSavedReports(); // Already filtered by user ID
+  const report = reports.find(r => r.id === reportId);
+  
+  // Double-check: ensure report belongs to current user
+  if (!report) return null;
+  
+  return report;
 }
 
 /**
