@@ -367,13 +367,13 @@ export function extractHighRiskCode(
     // Sort by risk score (highest first)
     sections.sort((a, b) => b.riskFactors.length - a.riskFactors.length);
 
-    // Limit to top 10 highest-risk sections per file (reduced from 20 for faster processing)
+    // Extract top 15 highest-risk sections per file (increased for better AI analysis)
     const topSections = sections
-      .slice(0, 10)
+      .slice(0, 15)
       .map(section => ({
         ...section,
-        // Truncate very long code sections to first 100 lines
-        code: section.code.split('\n').slice(0, 100).join('\n')
+        // Keep full code sections for AI analysis (removed truncation)
+        code: section.code
       }));
 
     if (topSections.length === 0) return null;
@@ -446,10 +446,10 @@ function extractWithPatterns(
   return {
     file: filepath,
     language,
-    sections: sections.slice(0, 10).map(section => ({
+    sections: sections.slice(0, 15).map(section => ({
       ...section,
-      // Truncate very long code sections
-      code: section.code.split('\n').slice(0, 100).join('\n')
+      // Keep full code for AI analysis
+      code: section.code
     })),
     summary: `Pattern-extracted ${sections.length} sections from ${filepath}`,
   };

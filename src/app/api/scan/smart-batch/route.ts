@@ -7,34 +7,90 @@ import type { AIFinding } from "@/lib/verification-layer";
 export const maxDuration = 60; // Vercel default for Pro plan
 export const dynamic = 'force-dynamic'; // Prevent caching
 
-const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an expert security auditor.
+const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an elite security researcher and software architect with deep expertise in finding subtle bugs that automated tools miss.
 
-Analyze the provided code sections and verify static findings.
+Your mission: Find REAL issues that matter in production. Think like an attacker and a senior engineer.
 
-Focus on:
-- Security vulnerabilities (injection, XSS, auth bypass, secrets)
-- Production failures (unhandled errors, race conditions, memory leaks)
-- Logic errors and data integrity issues
+ANALYZE FOR:
 
-Respond with ONLY valid JSON (no markdown):
+1. LOGIC BUGS & BUSINESS LOGIC FLAWS
+   - Race conditions in concurrent operations
+   - Off-by-one errors in loops and boundaries
+   - Incorrect state transitions
+   - Missing validation of business rules
+   - Edge cases that break assumptions
+   - Integer overflow/underflow
+   - Incorrect error handling that leaks state
+
+2. SECURITY VULNERABILITIES (Beyond Pattern Matching)
+   - Authentication bypass through logic flaws
+   - Authorization issues (IDOR, privilege escalation)
+   - Injection flaws (SQL, NoSQL, Command, LDAP, XPath)
+   - Insecure deserialization
+   - SSRF and XXE vulnerabilities
+   - Timing attacks and side channels
+   - Cryptographic misuse (weak keys, bad modes, no IV)
+   - Session fixation and hijacking
+
+3. DATA INTEGRITY & CORRUPTION RISKS
+   - Missing transaction boundaries
+   - Inconsistent state updates
+   - Lost updates in concurrent scenarios
+   - Incorrect data validation
+   - Type confusion bugs
+   - Null/undefined handling errors
+   - Data races and memory corruption
+
+4. PRODUCTION FAILURE SCENARIOS
+   - Unhandled edge cases that crash
+   - Resource exhaustion (memory, connections, file handles)
+   - Deadlocks and livelocks
+   - Cascading failures
+   - Missing circuit breakers
+   - Improper error propagation
+   - Silent failures that corrupt data
+
+5. PERFORMANCE & SCALABILITY KILLERS
+   - N+1 queries that will break under load
+   - Unbounded loops or recursion
+   - Memory leaks from closures or event listeners
+   - Blocking operations in async code
+   - Missing indexes on hot paths
+   - Inefficient algorithms (O(n²) where O(n) exists)
+
+THINK DEEPLY:
+- What happens if this runs 1000x concurrently?
+- What if the input is malicious?
+- What if the database is slow?
+- What if this fails halfway through?
+- What assumptions can an attacker break?
+- What edge cases will users hit?
+
+BE SPECIFIC:
+- Explain HOW the vulnerability works
+- Show the ATTACK VECTOR or failure scenario
+- Provide CONCRETE examples
+- Suggest PRECISE fixes
+
+Respond with ONLY valid JSON:
 {
   "findings": [
     {
       "id": "unique-kebab-id",
       "severity": "critical|high|medium|low|info",
       "category": "security|production|typing|logic|database|performance|reliability|configuration|code-quality|react|other",
-      "title": "specific title",
-      "description": "detailed explanation",
+      "title": "Specific, actionable title",
+      "description": "Detailed explanation of the issue, why it matters, and how it can be exploited or cause failure",
       "file": "relative/path",
       "line": 0,
-      "evidence": "exact code snippet",
-      "mitigation": "how to fix",
-      "prevention": "how to prevent"
+      "evidence": "exact code snippet showing the issue",
+      "mitigation": "Precise fix with code example if possible",
+      "prevention": "How to prevent this class of issues"
     }
   ]
 }
 
-Be strict. Only report real, verifiable issues present in the code.`;
+CRITICAL: Only report REAL issues you can prove exist. No false positives. Quality over quantity.`;
 
 interface SmartBatch {
   sections: ExtractedCode[];
@@ -174,28 +230,120 @@ function buildSmartBatchPrompt(
 ): string {
   let prompt = `Project: ${projectName} | Batch ${batchIndex + 1}/${totalBatches}\n\n`;
 
-  // Add extracted high-risk code sections (concise format)
+  // Build application context map (lightweight overview)
+  const contextMap = buildApplicationContext(batch);
+  if (contextMap) {
+    prompt += `=== APPLICATION CONTEXT ===\n${contextMap}\n\n`;
+  }
+
+  // Add extracted high-risk code sections (detailed analysis)
   if (batch.sections.length > 0) {
-    prompt += `=== CODE SECTIONS ===\n\n`;
+    prompt += `=== CODE TO ANALYZE ===\n\n`;
     
     for (const extracted of batch.sections) {
       prompt += `FILE: ${extracted.file}\n`;
+      prompt += `SUMMARY: ${extracted.summary}\n\n`;
 
       for (const section of extracted.sections) {
-        prompt += `\n${section.type} ${section.name} (L${section.startLine}-${section.endLine}):\n`;
-        prompt += `${section.code}\n`;
+        prompt += `${section.type} ${section.name} (L${section.startLine}-${section.endLine}):\n`;
+        prompt += `RISK: ${section.riskFactors.join(", ")}\n`;
+        prompt += `CONTEXT: ${section.context}\n\n`;
+        prompt += `${section.code}\n\n`;
       }
     }
   }
 
-  // Add static findings that need verification (concise format)
+  // Add static findings that need verification
   if (batch.staticFindings.length > 0) {
-    prompt += `\n=== VERIFY THESE ===\n\n`;
+    prompt += `=== VERIFY THESE PATTERNS ===\n\n`;
     
     for (const finding of batch.staticFindings) {
-      prompt += `${finding.file}:${finding.line} - ${finding.title}\n${finding.evidence}\n\n`;
+      prompt += `${finding.file}:${finding.line} - ${finding.title}\n`;
+      prompt += `${finding.evidence}\n`;
+      prompt += `Description: ${finding.description}\n\n`;
     }
   }
 
   return prompt;
+}
+
+/**
+ * Build lightweight application context to help AI understand the bigger picture
+ * without sending entire codebase
+ */
+function buildApplicationContext(batch: SmartBatch): string {
+  const context: string[] = [];
+  
+  // Extract imports and dependencies
+  const imports = new Set<string>();
+  const frameworks = new Set<string>();
+  const databases = new Set<string>();
+  const apiPatterns = new Set<string>();
+  
+  for (const section of batch.sections) {
+    for (const codeSection of section.sections) {
+      const code = codeSection.code;
+      
+      // Detect frameworks
+      if (/from ['"]react['"]|import.*React/.test(code)) frameworks.add('React');
+      if (/from ['"]next/.test(code)) frameworks.add('Next.js');
+      if (/from ['"]express['"]/.test(code)) frameworks.add('Express');
+      if (/from ['"]@nestjs/.test(code)) frameworks.add('NestJS');
+      if (/from ['"]fastify['"]/.test(code)) frameworks.add('Fastify');
+      
+      // Detect databases
+      if (/prisma|@prisma/.test(code)) databases.add('Prisma ORM');
+      if (/mongoose|mongodb/.test(code)) databases.add('MongoDB');
+      if (/pg|postgres/.test(code)) databases.add('PostgreSQL');
+      if (/mysql/.test(code)) databases.add('MySQL');
+      if (/redis/.test(code)) databases.add('Redis');
+      
+      // Detect API patterns
+      if (/router\.(get|post|put|delete|patch)/.test(code)) apiPatterns.add('REST API');
+      if (/GraphQL|graphql|apollo/.test(code)) apiPatterns.add('GraphQL');
+      if (/tRPC|trpc/.test(code)) apiPatterns.add('tRPC');
+      
+      // Extract key imports
+      const importMatches = code.matchAll(/from ['"]([^'"]+)['"]/g);
+      for (const match of importMatches) {
+        const pkg = match[1];
+        if (!pkg.startsWith('.') && !pkg.startsWith('/')) {
+          imports.add(pkg.split('/')[0]);
+        }
+      }
+    }
+  }
+  
+  // Build context summary
+  if (frameworks.size > 0) {
+    context.push(`Frameworks: ${Array.from(frameworks).join(', ')}`);
+  }
+  if (databases.size > 0) {
+    context.push(`Databases: ${Array.from(databases).join(', ')}`);
+  }
+  if (apiPatterns.size > 0) {
+    context.push(`API Style: ${Array.from(apiPatterns).join(', ')}`);
+  }
+  
+  // Add key dependencies (limit to most important)
+  const keyDeps = Array.from(imports).filter(pkg => 
+    ['axios', 'fetch', 'bcrypt', 'jsonwebtoken', 'passport', 'multer', 'zod', 'joi', 'yup'].includes(pkg)
+  );
+  if (keyDeps.length > 0) {
+    context.push(`Key Dependencies: ${keyDeps.join(', ')}`);
+  }
+  
+  // Extract function signatures from the batch for cross-reference
+  const functions = new Set<string>();
+  for (const section of batch.sections) {
+    for (const codeSection of section.sections) {
+      functions.add(`${section.file}::${codeSection.name}`);
+    }
+  }
+  
+  if (functions.size > 0) {
+    context.push(`\nFunctions in this batch:\n${Array.from(functions).slice(0, 20).join('\n')}`);
+  }
+  
+  return context.length > 0 ? context.join('\n') : '';
 }

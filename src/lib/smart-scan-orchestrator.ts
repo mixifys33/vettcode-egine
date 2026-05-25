@@ -310,8 +310,8 @@ function createSmartBatches(
   staticFindings: StaticFinding[],
   mode: ScanMode
 ): SmartBatch[] {
-  // Reduced batch sizes for faster processing
-  const MAX_CHARS_PER_BATCH = mode === "quick" ? 20_000 : 25_000; // Reduced from 42k/32k
+  // Increased batch sizes - parallel workers can handle more
+  const MAX_CHARS_PER_BATCH = mode === "quick" ? 35_000 : 40_000; // Increased from 20k/25k
   const batches: SmartBatch[] = [];
   
   let currentBatch: SmartBatch = { sections: [], staticFindings: [] };
