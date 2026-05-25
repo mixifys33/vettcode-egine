@@ -25,6 +25,7 @@ export interface VerifiedFinding extends AIFinding {
   verificationStatus: "confirmed" | "likely" | "uncertain" | "false-positive";
   verificationNotes: string;
   sources: ("static-analysis" | "ai-analysis" | "pattern-match")[];
+  source?: "static" | "ai" | "verified"; // Track origin for reporting
 }
 
 export interface VerificationResult {
@@ -172,6 +173,7 @@ function verifyIndividualFinding(
     verificationStatus,
     verificationNotes,
     sources,
+    source: sources.includes("static-analysis") ? "verified" as const : "ai" as const, // Tag AI-discovered findings
   };
 }
 

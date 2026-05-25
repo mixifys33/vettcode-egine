@@ -69,10 +69,22 @@ function scoreColor(score: number): string {
 
 function FindingItem({ f, isExpanded, onToggle }: { f: Finding; isExpanded: boolean; onToggle: () => void }) {
   return (
-    <article className={`finding-card severity-${f.severity}`}>
+    <article id={`finding-${f.id}`} className={`finding-card severity-${f.severity}`}>
       <div className="finding-meta">
         <span className={`badge badge-${f.severity}`}>{f.severity}</span>
         <span className="badge badge-info">{f.category}</span>
+        {f.source && (
+          <span style={{
+            fontSize: "0.7rem",
+            padding: "0.2rem 0.5rem",
+            borderRadius: "999px",
+            fontWeight: 600,
+            background: f.source === "verified" ? "var(--accent)" : f.source === "ai" ? "#8b5cf6" : "var(--muted)",
+            color: f.source === "static" ? "var(--text)" : "#fff"
+          }}>
+            {f.source === "verified" ? "✓ VERIFIED" : f.source === "ai" ? "🤖 AI" : "STATIC"}
+          </span>
+        )}
         {f.file && (
           <span style={{ fontSize: "0.78rem", color: "var(--muted)", wordBreak: "break-all" }}>
             {f.file}
@@ -804,6 +816,269 @@ export function ReportView({
           )}
         </div>
       )}
+
+      {/* AI Analysis Section */}
+      {(() => {
+        const aiFindings = sorted.filter(f => f.source === "ai" || f.source === "verified");
+        const staticFindings = sorted.filter(f => f.source === "static");
+        const verifiedFindings = sorted.filter(f => f.source === "verified");
+        
+        const hasAIAnalysis = aiFindings.length > 0 || report.metadata?.aiFindings || report.metadata?.verifiedFindings;
+        
+        if (!hasAIAnalysis) return null;
+        
+        return (
+          <div style={{
+            marginBottom: "1.5rem",
+            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05))",
+            border: "2px solid var(--primary)",
+            borderRadius: "12px",
+            padding: "1.5rem",
+            position: "relative",
+            overflow: "hidden"
+          }}>
+            <div style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "120px",
+              height: "120px",
+              background: "radial-gradient(circle at top right, rgba(99, 102, 241, 0.2), transparent)",
+              pointerEvents: "none"
+            }} />
+            
+            <div style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "1rem",
+              marginBottom: "1rem",
+              flexWrap: "wrap"
+            }}>
+              <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
+                🤖
+              </div>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <h3 style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  marginBottom: "0.5rem",
+                  color: "var(--primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  flexWrap: "wrap"
+                }}>
+                  AI Deep Analysis
+                  <span style={{
+                    background: "var(--primary)",
+                    color: "#fff",
+                    padding: "0.25rem 0.75rem",
+                    borderRadius: "999px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600
+                  }}>
+                    {aiFindings.length} findings
+                  </span>
+                </h3>
+                <p style={{
+                  fontSize: "0.9rem",
+                  color: "var(--muted)",
+                  marginBottom: "1rem"
+                }}>
+                  Advanced AI analysis discovered these issues by understanding your application's context, logic flow, and security patterns.
+                </p>
+              </div>
+            </div>
+            
+            {/* AI Stats */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: "0.75rem",
+              marginBottom: "1rem"
+            }}>
+              <div style={{
+                background: "rgba(0, 0, 0, 0.2)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                border: "1px solid rgba(99, 102, 241, 0.3)",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--primary)" }}>
+                  {report.metadata?.staticFindings ?? staticFindings.length}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                  Static Analysis
+                </div>
+              </div>
+              <div style={{
+                background: "rgba(0, 0, 0, 0.2)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                border: "1px solid rgba(139, 92, 246, 0.3)",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#8b5cf6" }}>
+                  {report.metadata?.aiFindings ?? aiFindings.filter(f => f.source === "ai").length}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                  AI Discovered
+                </div>
+              </div>
+              <div style={{
+                background: "rgba(0, 0, 0, 0.2)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                border: "1px solid rgba(34, 211, 165, 0.3)",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent)" }}>
+                  {report.metadata?.verifiedFindings ?? verifiedFindings.length}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                  AI Verified
+                </div>
+              </div>
+            </div>
+            
+            {/* AI Findings List */}
+            {aiFindings.length > 0 && (
+              <div style={{
+                background: "rgba(0, 0, 0, 0.2)",
+                borderRadius: "8px",
+                padding: "1rem",
+                border: "1px solid rgba(99, 102, 241, 0.3)"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.75rem"
+                }}>
+                  <h4 style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    margin: 0
+                  }}>
+                    🔍 AI-Discovered Issues
+                  </h4>
+                  <span style={{
+                    fontSize: "0.75rem",
+                    color: "var(--muted)",
+                    fontStyle: "italic"
+                  }}>
+                    {aiFindings.length} total
+                  </span>
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {aiFindings.slice(0, 5).map((finding) => (
+                    <div
+                      key={finding.id}
+                      style={{
+                        padding: "0.75rem",
+                        background: "rgba(0, 0, 0, 0.3)",
+                        borderRadius: "6px",
+                        border: `1px solid ${finding.source === "verified" ? "rgba(34, 211, 165, 0.3)" : "rgba(139, 92, 246, 0.3)"}`,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                      }}
+                      onClick={() => {
+                        // Scroll to the finding in the main findings section
+                        const element = document.getElementById(`finding-${finding.id}`);
+                        if (element) {
+                          element.scrollIntoView({ behavior: "smooth", block: "center" });
+                          // Highlight the finding briefly
+                          element.style.boxShadow = "0 0 0 3px var(--primary)";
+                          setTimeout(() => {
+                            element.style.boxShadow = "";
+                          }, 2000);
+                        }
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(0, 0, 0, 0.4)";
+                        e.currentTarget.style.borderColor = finding.source === "verified" ? "var(--accent)" : "#8b5cf6";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(0, 0, 0, 0.3)";
+                        e.currentTarget.style.borderColor = finding.source === "verified" ? "rgba(34, 211, 165, 0.3)" : "rgba(139, 92, 246, 0.3)";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                        <span className={`badge badge-${finding.severity}`} style={{ fontSize: "0.7rem" }}>
+                          {finding.severity}
+                        </span>
+                        {finding.source === "verified" && (
+                          <span style={{
+                            background: "var(--accent)",
+                            color: "#06080d",
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "999px",
+                            fontSize: "0.65rem",
+                            fontWeight: 600
+                          }}>
+                            ✓ VERIFIED
+                          </span>
+                        )}
+                        {finding.source === "ai" && (
+                          <span style={{
+                            background: "#8b5cf6",
+                            color: "#fff",
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "999px",
+                            fontSize: "0.65rem",
+                            fontWeight: 600
+                          }}>
+                            🤖 AI
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)", marginBottom: "0.25rem" }}>
+                        {finding.title}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                        {finding.description.length > 120 
+                          ? finding.description.substring(0, 120) + "..." 
+                          : finding.description}
+                      </div>
+                      {finding.file && (
+                        <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.25rem", fontFamily: "monospace" }}>
+                          📄 {finding.file}{finding.line ? `:${finding.line}` : ""}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {aiFindings.length > 5 && (
+                  <p style={{
+                    marginTop: "0.75rem",
+                    fontSize: "0.75rem",
+                    color: "var(--muted)",
+                    textAlign: "center",
+                    fontStyle: "italic"
+                  }}>
+                    + {aiFindings.length - 5} more AI findings below in the main findings section
+                  </p>
+                )}
+              </div>
+            )}
+            
+            <div style={{
+              marginTop: "1rem",
+              padding: "0.75rem 1rem",
+              background: "rgba(0, 0, 0, 0.2)",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              color: "var(--muted)",
+              borderLeft: "3px solid var(--primary)"
+            }}>
+              💡 <strong style={{ color: "var(--primary)" }}>How AI Analysis Works:</strong> Our AI examines your code's context, understands business logic, traces data flow, and identifies subtle vulnerabilities that pattern-based scanners miss.
+            </div>
+          </div>
+        );
+      })()}
 
       <h2 className="section-heading" style={{ marginBottom: "0.75rem" }}>
         Findings ({filteredFindings.length} of {sorted.length})

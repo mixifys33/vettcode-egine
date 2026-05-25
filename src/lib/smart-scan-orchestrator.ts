@@ -135,6 +135,7 @@ export async function runSmartScan(
     verificationStatus: "confirmed" as const,
     verificationNotes: "Detected by static analysis",
     sources: ["static-analysis" as const],
+    source: "static" as const, // Tag as static finding
   }));
 
   // Merge all findings
@@ -177,6 +178,7 @@ export async function runSmartScan(
       evidence: f.evidence,
       mitigation: f.mitigation,
       prevention: f.prevention,
+      source: f.source, // Include source tag
     })),
     strengths,
     criticalBlockers,
@@ -190,6 +192,10 @@ export async function runSmartScan(
       reportConfidenceGrade: reportConfidence.grade,
       reportConfidenceExplanation: reportConfidence.explanation,
       fileTree: buildFileTree(files),
+      // AI analysis stats
+      staticFindings: deduplicated.filter(f => f.source === "static").length,
+      aiFindings: deduplicated.filter(f => f.source === "ai").length,
+      verifiedFindings: deduplicated.filter(f => f.source === "verified").length,
     },
   };
 

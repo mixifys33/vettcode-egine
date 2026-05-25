@@ -24,6 +24,7 @@ export interface Finding {
   evidence?: string;
   mitigation: string;
   prevention: string;
+  source?: "static" | "ai" | "verified"; // Track where finding came from
 }
 
 export interface BatchAnalysisResult {
@@ -51,6 +52,10 @@ export interface VettReport {
     reportConfidenceGrade?: string;
     reportConfidenceExplanation?: string;
     fileTree?: FileTreeNode[];
+    // AI analysis stats
+    staticFindings?: number;
+    aiFindings?: number;
+    verifiedFindings?: number;
   };
   // Legacy fields for backward compatibility
   scannedFiles?: number;
