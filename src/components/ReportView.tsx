@@ -827,6 +827,64 @@ export function ReportView({
         
         if (!hasAIAnalysis) return null;
         
+        // Calculate AI-specific score (brutal honesty)
+        const calculateAIScore = (): number => {
+          if (aiFindings.length === 0) return 100;
+
+          let deductions = 0;
+          
+          aiFindings.forEach(finding => {
+            switch (finding.severity) {
+              case "critical":
+                deductions += 15;
+                break;
+              case "high":
+                deductions += 10;
+                break;
+              case "medium":
+                deductions += 5;
+                break;
+              case "low":
+                deductions += 2;
+                break;
+              case "info":
+                deductions += 1;
+                break;
+            }
+          });
+
+          // Extra deduction for verified findings (AI + static both found it = definitely real)
+          deductions += verifiedFindings.length * 5;
+
+          const score = Math.max(0, 100 - deductions);
+          return Math.round(score);
+        };
+
+        const aiScore = calculateAIScore();
+        
+        const getScoreColor = (score: number): string => {
+          if (score >= 80) return "var(--accent)";
+          if (score >= 60) return "#a8e06a";
+          if (score >= 40) return "var(--warning)";
+          return "var(--danger)";
+        };
+        
+        const getScoreGrade = (score: number): string => {
+          if (score >= 90) return "A+";
+          if (score >= 80) return "A";
+          if (score >= 70) return "B";
+          if (score >= 60) return "C";
+          if (score >= 50) return "D";
+          return "F";
+        };
+        
+        const handleViewFullAnalysis = () => {
+          // Store report in sessionStorage for AI analysis page
+          sessionStorage.setItem("vettcode_current_report", JSON.stringify(report));
+          // Navigate to AI analysis page
+          window.location.href = "/ai-analysis";
+        };
+        
         return (
           <div style={{
             marginBottom: "1.5rem",
@@ -858,17 +916,54 @@ export function ReportView({
                 🤖
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
-                <h3 style={{
-                  fontSize: "1.25rem",
-                  fontWeight: 700,
-                  marginBottom: "0.5rem",
-                  color: "var(--primary)",
+                <div style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.5rem",
+                  gap: "1rem",
+                  marginBottom: "0.5rem",
                   flexWrap: "wrap"
                 }}>
-                  AI Deep Analysis
+                  <h3 style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    color: "var(--primary)",
+                    margin: 0
+                  }}>
+                    AI Deep Analysis
+                  </h3>
+                  
+                  {/* AI Score Badge */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    background: "rgba(0, 0, 0, 0.3)",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "999px",
+                    border: `2px solid ${getScoreColor(aiScore)}`
+                  }}>
+                    <span style={{
+                      fontSize: "1.2rem",
+                      fontWeight: 700,
+                      color: getScoreColor(aiScore)
+                    }}>
+                      {aiScore}
+                    </span>
+                    <span style={{
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                      color: getScoreColor(aiScore)
+                    }}>
+                      {getScoreGrade(aiScore)}
+                    </span>
+                    <span style={{
+                      fontSize: "0.75rem",
+                      color: "var(--muted)"
+                    }}>
+                      AI Score
+                    </span>
+                  </div>
+                  
                   <span style={{
                     background: "var(--primary)",
                     color: "#fff",
@@ -879,7 +974,7 @@ export function ReportView({
                   }}>
                     {aiFindings.length} findings
                   </span>
-                </h3>
+                </div>
                 <p style={{
                   fontSize: "0.9rem",
                   color: "var(--muted)",
@@ -1072,9 +1167,42 @@ export function ReportView({
               borderRadius: "6px",
               fontSize: "0.85rem",
               color: "var(--muted)",
-              borderLeft: "3px solid var(--primary)"
+              borderLeft: "3px solid var(--primary)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "1rem"
             }}>
-              💡 <strong style={{ color: "var(--primary)" }}>How AI Analysis Works:</strong> Our AI examines your code's context, understands business logic, traces data flow, and identifies subtle vulnerabilities that pattern-based scanners miss.
+              <div>
+                💡 <strong style={{ color: "var(--primary)" }}>How AI Analysis Works:</strong> Our AI examines your code's context, understands business logic, traces data flow, and identifies subtle vulnerabilities that pattern-based scanners miss.
+              </div>
+              <button
+                type="button"
+                onClick={handleViewFullAnalysis}
+                style={{
+                  padding: "0.75rem 1.5rem",
+                  fontSize: "0.9rem",
+                  background: "var(--primary)",
+                  border: "none",
+                  borderRadius: "6px",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  transition: "all 0.2s ease",
+                  whiteSpace: "nowrap"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                📊 View Full AI Analysis
+              </button>
             </div>
           </div>
         );
