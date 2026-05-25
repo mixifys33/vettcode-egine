@@ -4,23 +4,17 @@ import type { ExtractedCode } from "@/lib/ast-extractor";
 import type { StaticFinding } from "@/lib/static-analyzer";
 import type { AIFinding } from "@/lib/verification-layer";
 
-export const maxDuration = 300; // 5 minutes - maximum for Vercel Pro plan
+export const maxDuration = 60; // Vercel default for Pro plan
 export const dynamic = 'force-dynamic'; // Prevent caching
 
-const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an expert security auditor and code quality analyst.
+const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an expert security auditor.
 
-You receive:
-1. HIGH-RISK CODE SECTIONS extracted via AST analysis (not full files)
-2. LOW-CONFIDENCE findings from static analysis that need your verification
+Analyze the provided code sections and verify static findings.
 
-Your job:
-- Analyze ONLY the provided code sections for real vulnerabilities and issues
-- Verify the static findings: confirm if they're real issues or false positives
-- DO NOT invent issues that aren't present in the code
-- DO NOT report issues already covered by static analysis unless you have additional context
-- Focus on: security vulnerabilities, production failures, logic errors, race conditions, data integrity issues
-
-Be STRICT and HONEST. Only report issues you can prove exist in the provided code.
+Focus on:
+- Security vulnerabilities (injection, XSS, auth bypass, secrets)
+- Production failures (unhandled errors, race conditions, memory leaks)
+- Logic errors and data integrity issues
 
 Respond with ONLY valid JSON (no markdown):
 {
@@ -30,15 +24,17 @@ Respond with ONLY valid JSON (no markdown):
       "severity": "critical|high|medium|low|info",
       "category": "security|production|typing|logic|database|performance|reliability|configuration|code-quality|react|other",
       "title": "specific title",
-      "description": "detailed explanation with context",
+      "description": "detailed explanation",
       "file": "relative/path",
       "line": 0,
       "evidence": "exact code snippet",
-      "mitigation": "how to fix immediately",
-      "prevention": "how to prevent recurrence"
+      "mitigation": "how to fix",
+      "prevention": "how to prevent"
     }
   ]
-}`;
+}
+
+Be strict. Only report real, verifiable issues present in the code.`;
 
 interface SmartBatch {
   sections: ExtractedCode[];
@@ -172,41 +168,30 @@ function buildSmartBatchPrompt(
   totalBatches: number,
   batch: SmartBatch
 ): string {
-  let prompt = `Project: ${projectName}\nBatch: ${batchIndex + 1} of ${totalBatches}\n\n`;
+  let prompt = `Project: ${projectName} | Batch ${batchIndex + 1}/${totalBatches}\n\n`;
 
-  // Add extracted high-risk code sections
+  // Add extracted high-risk code sections (concise format)
   if (batch.sections.length > 0) {
-    prompt += `=== HIGH-RISK CODE SECTIONS (AST-extracted) ===\n\n`;
+    prompt += `=== CODE SECTIONS ===\n\n`;
     
     for (const extracted of batch.sections) {
-      prompt += `FILE: ${extracted.file} (${extracted.language})\n`;
-      prompt += `Summary: ${extracted.summary}\n\n`;
+      prompt += `FILE: ${extracted.file}\n`;
 
       for (const section of extracted.sections) {
-        prompt += `--- ${section.type}: ${section.name} (lines ${section.startLine}-${section.endLine}) ---\n`;
-        prompt += `Risk factors: ${section.riskFactors.join(", ")}\n`;
-        prompt += `Context: ${section.context}\n\n`;
-        prompt += `${section.code}\n\n`;
-        prompt += `--- END ${section.name} ---\n\n`;
+        prompt += `\n${section.type} ${section.name} (L${section.startLine}-${section.endLine}):\n`;
+        prompt += `${section.code}\n`;
       }
     }
   }
 
-  // Add static findings that need verification
+  // Add static findings that need verification (concise format)
   if (batch.staticFindings.length > 0) {
-    prompt += `\n=== STATIC ANALYSIS FINDINGS (verify these) ===\n\n`;
+    prompt += `\n=== VERIFY THESE ===\n\n`;
     
     for (const finding of batch.staticFindings) {
-      prompt += `${finding.file}:${finding.line} - ${finding.title}\n`;
-      prompt += `Severity: ${finding.severity} | Confidence: ${finding.confidence}\n`;
-      prompt += `Evidence: ${finding.evidence}\n`;
-      prompt += `Description: ${finding.description}\n\n`;
+      prompt += `${finding.file}:${finding.line} - ${finding.title}\n${finding.evidence}\n\n`;
     }
-
-    prompt += `\nFor each static finding above, verify if it's a real issue or false positive. If real, include it in your findings with additional context.\n`;
   }
-
-  prompt += `\nAnalyze the code sections above. Report ONLY real, verifiable issues. Include file path, line number, and exact evidence.`;
 
   return prompt;
 }

@@ -86,8 +86,8 @@ export async function chatCompletion(
   const body: Record<string, unknown> = {
     models,
     messages,
-    temperature: 0.2,
-    max_tokens: 6144,
+    temperature: 0.1, // Lower temperature for faster, more focused responses
+    max_tokens: 4096, // Reduced from 6144 for faster responses
   };
 
   if (models.length === 1) {

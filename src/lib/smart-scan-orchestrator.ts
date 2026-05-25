@@ -305,7 +305,8 @@ function createSmartBatches(
   staticFindings: StaticFinding[],
   mode: ScanMode
 ): SmartBatch[] {
-  const MAX_CHARS_PER_BATCH = mode === "quick" ? 42_000 : 32_000;
+  // Reduced batch sizes for faster processing
+  const MAX_CHARS_PER_BATCH = mode === "quick" ? 20_000 : 25_000; // Reduced from 42k/32k
   const batches: SmartBatch[] = [];
   
   let currentBatch: SmartBatch = { sections: [], staticFindings: [] };
@@ -353,7 +354,7 @@ async function analyzeBatchWithAI(
 ): Promise<AIFinding[]> {
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 280000); // 280 seconds (4min 40s) - slightly less than server timeout
+  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 seconds - slightly less than server timeout
   
   try {
     const res = await fetch("/api/scan/smart-batch", {
@@ -400,7 +401,7 @@ async function analyzeBatchWithAI(
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        console.warn(`Batch ${batchIndex} timed out after 280s, skipping...`);
+        console.warn(`Batch ${batchIndex} timed out after 55s, skipping...`);
       } else {
         console.error(`Batch ${batchIndex} failed:`, error.message);
       }
