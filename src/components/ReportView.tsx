@@ -2,7 +2,9 @@
 
 import type { Finding, VettReport, FileTreeNode } from "@/lib/types";
 import type { ScanMode } from "@/lib/smart-scan-orchestrator";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { PreListModal, type PreListFormData } from "./PreListModal";
+import { AutoPreListSettings } from "./AutoPreListSettings";
 
 function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
   const [isOpen, setIsOpen] = useState(level < 2);
@@ -149,6 +151,44 @@ export function ReportView({
   const [showFileTree, setShowFileTree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [showPreListModal, setShowPreListModal] = useState(false);
+  const [showAutoPreListSettings, setShowAutoPreListSettings] = useState(false);
+  const [autoPreListEnabled, setAutoPreListEnabled] = useState(false);
+  
+  // Check auto pre-list setting on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("vettcode_auto_prelist");
+    setAutoPreListEnabled(saved === "true");
+  }, []);
+  
+  // Auto-open modal if setting is enabled and score >= 60
+  useEffect(() => {
+    if (autoPreListEnabled && report.score >= 60) {
+      // Check if user is authenticated
+      const token = localStorage.getItem("sellerToken");
+      if (token) {
+        // Small delay to let the report render first
+        const timer = setTimeout(() => {
+          setShowPreListModal(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [autoPreListEnabled, report.score]);
+  
+  // Check if user came back from login
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openPreList") === "true") {
+      // Remove the parameter
+      window.history.replaceState({}, "", window.location.pathname);
+      // Open modal if user is authenticated
+      const token = localStorage.getItem("sellerToken");
+      if (token) {
+        setShowPreListModal(true);
+      }
+    }
+  }, []);
   
   const sorted = [...report.findings].sort((a, b) => {
     const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -241,44 +281,85 @@ export function ReportView({
     URL.revokeObjectURL(url);
   };
   
-  // Handle monetize/pre-list submission
-  const handleMonetize = async () => {
+  // Handle monetize button click - check auth and open modal
+  const handleMonetizeClick = () => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
+    
+    if (!token) {
+      // Store current URL and redirect to login
+      const currentUrl = window.location.href;
+      const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
+      localStorage.setItem("vettcode_return_url", scannerUrl);
+      window.location.href = "https://vettcodedev.vercel.app/login";
+      return;
+    }
+
+    // User is authenticated, open modal
+    setShowPreListModal(true);
+  };
+
+  // Handle settings save
+  const handleAutoPreListSave = (enabled: boolean) => {
+    setAutoPreListEnabled(enabled);
+    if (enabled) {
+      // Show success message
+      alert("✅ Auto pre-list enabled! The form will open automatically after each scan (score ≥ 60).");
+    }
+  };
+
+  // Handle form submission from modal
+  const handlePreListSubmit = async (formData: PreListFormData) => {
     setIsSubmitting(true);
     setSubmitError("");
 
     try {
-      // Check if user is authenticated (check for seller token)
       const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
       
       if (!token) {
-        // Redirect to seller login/register page
-        window.location.href = "https://vettcodedev.vercel.app/login";
-        return;
+        throw new Error("Authentication required");
       }
 
-      // Prepare submission data
-      const submissionData = {
-        projectName: report.metadata?.projectName || "Untitled Project",
-        projectDescription: report.summary || "",
-        vettScore: report.score,
-        vettGrade: report.grade,
-        executiveVerdict: report.executiveVerdict,
-        scanReport: JSON.stringify(report),
-        languages: extractLanguages(report),
-        frameworks: extractFrameworks(report),
-        hasTests: report.strengths?.some(s => s.toLowerCase().includes("test")) || false,
-        hasDocumentation: report.strengths?.some(s => s.toLowerCase().includes("documentation")) || false,
-      };
+      // Prepare form data for multipart/form-data
+      const submitData = new FormData();
+      
+      // Add text fields
+      submitData.append("projectName", formData.projectName);
+      submitData.append("projectDescription", formData.projectDescription);
+      submitData.append("detailedDescription", formData.detailedDescription);
+      submitData.append("vettScore", report.score.toString());
+      submitData.append("vettGrade", report.grade);
+      submitData.append("executiveVerdict", report.executiveVerdict);
+      submitData.append("scanReport", JSON.stringify(report));
+      submitData.append("fileTree", JSON.stringify(report.metadata?.fileTree || null));
+      submitData.append("languages", JSON.stringify(extractLanguages(report)));
+      submitData.append("frameworks", JSON.stringify(extractFrameworks(report)));
+      submitData.append("hasTests", String(report.strengths?.some(s => s.toLowerCase().includes("test")) || false));
+      submitData.append("hasDocumentation", String(report.strengths?.some(s => s.toLowerCase().includes("documentation")) || false));
+      submitData.append("category", formData.category);
+      submitData.append("subCategory", formData.subCategory);
+      submitData.append("tags", formData.tags);
+      submitData.append("regularPrice", formData.regularPrice);
+      submitData.append("salePrice", formData.salePrice);
+      submitData.append("licenseType", formData.licenseType);
+      submitData.append("demoUrl", formData.demoUrl);
+      submitData.append("documentationUrl", formData.documentationUrl);
+      submitData.append("videoUrl", formData.videoUrl);
+      submitData.append("features", JSON.stringify(formData.features.filter(f => f.trim())));
+      
+      // Add images
+      formData.images.forEach((image) => {
+        submitData.append("images", image);
+      });
 
       // Submit to backend
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
       const response = await fetch(`${backendUrl}/api/pre-listed-code/submit`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(submissionData),
+        body: submitData,
       });
 
       const data = await response.json();
@@ -292,13 +373,12 @@ export function ReportView({
         projectName: data.data.projectName,
         vettScore: data.data.vettScore.toString(),
         vettGrade: data.data.vettGrade,
-        email: "", // Will be fetched from seller profile
       });
 
       window.location.href = `/pre-list-success?${params.toString()}`;
     } catch (error: any) {
       console.error("Monetization error:", error);
-      setSubmitError(error.message || "Failed to pre-list code. Please try again.");
+      throw error; // Re-throw to be handled by modal
     } finally {
       setIsSubmitting(false);
     }
@@ -307,9 +387,36 @@ export function ReportView({
   // Helper: Extract languages from report
   const extractLanguages = (report: VettReport): string[] => {
     const languages = new Set<string>();
+    
+    // Extract from file extensions
     report.findings.forEach((finding) => {
-      if (finding.language) languages.add(finding.language);
+      if (finding.file) {
+        const ext = finding.file.split('.').pop()?.toLowerCase();
+        if (ext) {
+          const langMap: Record<string, string> = {
+            'js': 'JavaScript',
+            'jsx': 'JavaScript',
+            'ts': 'TypeScript',
+            'tsx': 'TypeScript',
+            'py': 'Python',
+            'java': 'Java',
+            'cpp': 'C++',
+            'c': 'C',
+            'cs': 'C#',
+            'go': 'Go',
+            'rb': 'Ruby',
+            'php': 'PHP',
+            'swift': 'Swift',
+            'kt': 'Kotlin',
+            'rs': 'Rust',
+          };
+          if (langMap[ext]) {
+            languages.add(langMap[ext]);
+          }
+        }
+      }
     });
+    
     return Array.from(languages);
   };
 
@@ -846,21 +953,51 @@ export function ReportView({
               💰
             </div>
             <div style={{ flex: 1, minWidth: "200px" }}>
-              <h3 style={{
-                fontSize: "1.25rem",
-                fontWeight: 700,
-                marginBottom: "0.5rem",
-                background: "linear-gradient(90deg, var(--accent), var(--primary))",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent"
-              }}>
-                Ready to Earn from Your Code?
-              </h3>
-              <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
-                Your code scored <span style={{ fontWeight: 700, color: "var(--accent)" }}>{report.grade}</span>! 
-                Pre-list it on VETTCODE and get notified when corporate buyers can purchase it.
-              </p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    marginBottom: "0.5rem",
+                    background: "linear-gradient(90deg, var(--accent), var(--primary))",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    color: "transparent"
+                  }}>
+                    Ready to Earn from Your Code?
+                  </h3>
+                  <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
+                    Your code scored <span style={{ fontWeight: 700, color: "var(--accent)" }}>{report.grade}</span>! 
+                    Pre-list it on VETTCODE and get notified when corporate buyers can purchase it.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAutoPreListSettings(true)}
+                  title="Auto Pre-List Settings"
+                  style={{
+                    padding: "0.5rem",
+                    background: "rgba(99, 102, 241, 0.1)",
+                    border: "1px solid rgba(99, 102, 241, 0.3)",
+                    borderRadius: "6px",
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                    fontSize: "1.2rem",
+                    transition: "all 0.2s ease",
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.2)";
+                    e.currentTarget.style.borderColor = "var(--primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.1)";
+                    e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)";
+                  }}
+                >
+                  ⚙️
+                </button>
+              </div>
             </div>
           </div>
           
@@ -914,7 +1051,7 @@ export function ReportView({
           )}
           
           <button
-            onClick={handleMonetize}
+            onClick={handleMonetizeClick}
             disabled={isSubmitting}
             style={{
               display: "block",
@@ -1113,10 +1250,25 @@ export function ReportView({
 
       <p className="disclaimer" style={{ marginTop: "1rem" }}>
         Scores are strict estimates. Use findings alongside tests, threat
-        modeling, and professional review before release.
+        modeling, and professional review before release because if we score your application poor then its poor according to the industrial standards
         {scanMode === "quick" &&
           " Quick scan prioritizes high-signal surfaces — run deep scan before major releases."}
       </p>
+
+      {/* Pre-List Modal */}
+      <PreListModal
+        isOpen={showPreListModal}
+        onClose={() => setShowPreListModal(false)}
+        report={report}
+        onSubmit={handlePreListSubmit}
+      />
+
+      {/* Auto Pre-List Settings Modal */}
+      <AutoPreListSettings
+        isOpen={showAutoPreListSettings}
+        onClose={() => setShowAutoPreListSettings(false)}
+        onSave={handleAutoPreListSave}
+      />
     </div>
   );
 }
