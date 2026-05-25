@@ -213,7 +213,12 @@ async function runAIAnalysis(
   mode: ScanMode
 ): Promise<AIFinding[]> {
   
+  console.log(`[AI Analysis] Starting ${mode} mode analysis`);
+  console.log(`[AI Analysis] Extracted sections: ${extractedSections.length}`);
+  console.log(`[AI Analysis] Low-confidence static findings: ${lowConfidenceStaticFindings.length}`);
+  
   if (extractedSections.length === 0 && lowConfidenceStaticFindings.length === 0) {
+    console.log('[AI Analysis] No content to analyze, skipping AI');
     return [];
   }
 
@@ -221,6 +226,9 @@ async function runAIAnalysis(
     createSmartBatches(extractedSections, lowConfidenceStaticFindings, mode),
     mode === "quick" ? 10 : 48
   );
+  
+  console.log(`[AI Analysis] Created ${batches.length} batches for processing`);
+  
   const aiFindings: AIFinding[] = [];
   const phaseLabel = mode === "quick" ? "AI review" : "AI deep review";
 
@@ -235,14 +243,20 @@ async function runAIAnalysis(
       `Round ${Math.floor(i / PARALLEL_AI_CALLS) + 1} · ${done}/${batches.length} segments · 3 parallel workers`
     );
 
+    console.log(`[AI Analysis] Processing batch round ${Math.floor(i / PARALLEL_AI_CALLS) + 1}, batches ${i}-${i + slice.length - 1}`);
+
     const promises = slice.map((batch, j) =>
       analyzeBatchWithAI(projectName, i + j, batches.length, batch, j)
     );
 
     const results = await Promise.all(promises);
-    aiFindings.push(...results.flat());
+    const newFindings = results.flat();
+    aiFindings.push(...newFindings);
+    
+    console.log(`[AI Analysis] Round ${Math.floor(i / PARALLEL_AI_CALLS) + 1} complete: ${newFindings.length} findings`);
   }
 
+  console.log(`[AI Analysis] ✓ Complete: ${aiFindings.length} total AI findings`);
   return aiFindings;
 }
 

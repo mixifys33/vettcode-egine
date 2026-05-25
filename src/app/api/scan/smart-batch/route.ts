@@ -47,7 +47,11 @@ interface SmartBatch {
 
 export async function POST(req: NextRequest) {
   try {
-    if (getApiKeys().length === 0) {
+    const apiKeys = getApiKeys();
+    console.log(`[Smart Batch] API Keys available: ${apiKeys.length}`);
+    
+    if (apiKeys.length === 0) {
+      console.error('[Smart Batch] CRITICAL: No API keys configured!');
       return NextResponse.json(
         { error: "OpenRouter API keys not configured" },
         { status: 500 }
@@ -63,14 +67,22 @@ export async function POST(req: NextRequest) {
       keySlot?: number;
     };
 
+    console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${projectName}`);
+    console.log(`[Smart Batch ${batchIndex}] Sections: ${batch.sections?.length || 0}, Static findings: ${batch.staticFindings?.length || 0}`);
+
     if (!batch || (!batch.sections?.length && !batch.staticFindings?.length)) {
+      console.warn(`[Smart Batch ${batchIndex}] Empty batch received`);
       return NextResponse.json({ error: "Empty batch" }, { status: 400 });
     }
 
     const slot = keySlot ?? batchIndex;
     const apiKey = keyForIndex(slot);
+    console.log(`[Smart Batch ${batchIndex}] Using API key slot ${slot}`);
 
     const userPrompt = buildSmartBatchPrompt(projectName, batchIndex, totalBatches, batch);
+
+    console.log(`[Smart Batch ${batchIndex}] Sending request to OpenRouter...`);
+    console.log(`[Smart Batch ${batchIndex}] Prompt length: ${userPrompt.length} chars`);
 
     let content: string;
     let model: string;
@@ -85,9 +97,11 @@ export async function POST(req: NextRequest) {
       );
       content = result.content;
       model = result.model;
+      console.log(`[Smart Batch ${batchIndex}] ✓ AI response received from ${model}`);
+      console.log(`[Smart Batch ${batchIndex}] Response length: ${content.length} chars`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI request failed";
-      console.error(`Batch ${batchIndex} AI error:`, message);
+      console.error(`[Smart Batch ${batchIndex}] ✗ AI request failed:`, message);
       
       // Return empty findings instead of failing
       return NextResponse.json({
@@ -102,10 +116,11 @@ export async function POST(req: NextRequest) {
     
     try {
       parsed = parseJsonFromModel<{ findings: AIFinding[] }>(content);
+      console.log(`[Smart Batch ${batchIndex}] ✓ Parsed ${parsed.findings?.length || 0} findings from AI response`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "JSON parse failed";
-      console.error(`Batch ${batchIndex} parse error:`, message);
-      console.error('Raw content:', content.substring(0, 500));
+      console.error(`[Smart Batch ${batchIndex}] ✗ JSON parse error:`, message);
+      console.error(`[Smart Batch ${batchIndex}] Raw content preview:`, content.substring(0, 500));
       
       // Return empty findings instead of failing
       return NextResponse.json({
@@ -132,6 +147,8 @@ export async function POST(req: NextRequest) {
       prevention: typeof f.prevention === 'string' ? f.prevention : String(f.prevention || ''),
     }));
 
+    console.log(`[Smart Batch ${batchIndex}] ✓ Returning ${validFindings.length} valid findings`);
+
     return NextResponse.json({
       findings: validFindings,
       batchIndex,
@@ -139,7 +156,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Smart batch analysis failed";
-    console.error("Smart batch error:", message, e);
+    console.error("[Smart Batch] CRITICAL ERROR:", message, e);
     
     // Return empty findings to allow scan to continue
     return NextResponse.json({ 

@@ -2,6 +2,7 @@
 export const IGNORED_DIR_NAMES = new Set([
   "node_modules",
   ".git",
+  ".github",
   ".svn",
   ".hg",
   "dist",

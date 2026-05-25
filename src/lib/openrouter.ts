@@ -17,6 +17,16 @@ export function getApiKeys(): string[] {
     const k = process.env[`OPENROUTER_API_KEY_${i}`];
     if (k?.trim()) keys.push(k.trim());
   }
+  
+  // Debug logging (remove after testing)
+  if (keys.length === 0) {
+    console.error('[OpenRouter] No API keys found! Check environment variables.');
+    console.error('[OpenRouter] OPENROUTER_API_KEYS:', process.env.OPENROUTER_API_KEYS ? 'SET' : 'NOT SET');
+    console.error('[OpenRouter] OPENROUTER_API_KEY_1:', process.env.OPENROUTER_API_KEY_1 ? 'SET' : 'NOT SET');
+  } else {
+    console.log(`[OpenRouter] Found ${keys.length} API key(s)`);
+  }
+  
   return [...new Set(keys)];
 }
 
@@ -87,6 +97,10 @@ export async function chatCompletion(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      console.log(`[OpenRouter] Attempt ${attempt + 1}/${retries + 1} - Calling ${OPENROUTER_URL}`);
+      console.log(`[OpenRouter] Models: ${JSON.stringify(models)}`);
+      console.log(`[OpenRouter] Message count: ${messages.length}, Total chars: ${messages.reduce((sum, m) => sum + m.content.length, 0)}`);
+      
       const res = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers: {
@@ -98,12 +112,16 @@ export async function chatCompletion(
         body: JSON.stringify(body),
       });
 
+      console.log(`[OpenRouter] Response status: ${res.status}`);
+
       if (!res.ok) {
         const errText = await res.text();
+        console.error(`[OpenRouter] Error response:`, errText.slice(0, 500));
         
         // Check for rate limit or temporary errors
         if (res.status === 429 || res.status === 503) {
           if (attempt < retries) {
+            console.warn(`[OpenRouter] Rate limited or service unavailable, retrying in ${2000 * (attempt + 1)}ms...`);
             await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
             continue;
           }
@@ -119,21 +137,26 @@ export async function chatCompletion(
 
       const content = data.choices?.[0]?.message?.content?.trim();
       
+      console.log(`[OpenRouter] Response model: ${data.model || 'unknown'}`);
+      console.log(`[OpenRouter] Content length: ${content?.length || 0} chars`);
+      
       if (!content) {
         if (attempt < retries) {
-          console.warn(`Empty response from OpenRouter, retrying (${attempt + 1}/${retries})...`);
+          console.warn(`[OpenRouter] Empty response, retrying (${attempt + 1}/${retries})...`);
           await new Promise(resolve => setTimeout(resolve, 1000));
           continue;
         }
         throw new Error("Empty response from OpenRouter after retries");
       }
 
+      console.log(`[OpenRouter] ✓ Success on attempt ${attempt + 1}`);
       return { content, model: data.model ?? models[0] };
     } catch (error) {
       if (attempt === retries) {
+        console.error(`[OpenRouter] ✗ All attempts failed:`, error);
         throw error;
       }
-      console.warn(`Attempt ${attempt + 1} failed, retrying...`, error);
+      console.warn(`[OpenRouter] Attempt ${attempt + 1} failed, retrying...`, error);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
