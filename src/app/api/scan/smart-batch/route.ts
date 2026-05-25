@@ -4,7 +4,7 @@ import type { ExtractedCode } from "@/lib/ast-extractor";
 import type { StaticFinding } from "@/lib/static-analyzer";
 import type { AIFinding } from "@/lib/verification-layer";
 
-export const maxDuration = 60; // Vercel max for Hobby/Pro plan (increased for large codebases)
+export const maxDuration = 300; // 5 minutes - maximum for Vercel Pro plan
 export const dynamic = 'force-dynamic'; // Prevent caching
 
 const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an expert security auditor and code quality analyst.
