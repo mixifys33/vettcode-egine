@@ -74,9 +74,36 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
 
   const extractLanguages = (report: VettReport): string[] => {
     const languages = new Set<string>();
+    
+    // Extract from file extensions
     report.findings.forEach((finding) => {
-      if (finding.language) languages.add(finding.language);
+      if (finding.file) {
+        const ext = finding.file.split('.').pop()?.toLowerCase();
+        if (ext) {
+          const langMap: Record<string, string> = {
+            'js': 'JavaScript',
+            'jsx': 'JavaScript',
+            'ts': 'TypeScript',
+            'tsx': 'TypeScript',
+            'py': 'Python',
+            'java': 'Java',
+            'cpp': 'C++',
+            'c': 'C',
+            'cs': 'C#',
+            'go': 'Go',
+            'rb': 'Ruby',
+            'php': 'PHP',
+            'swift': 'Swift',
+            'kt': 'Kotlin',
+            'rs': 'Rust',
+          };
+          if (langMap[ext]) {
+            languages.add(langMap[ext]);
+          }
+        }
+      }
     });
+    
     return Array.from(languages);
   };
 
