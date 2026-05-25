@@ -55,15 +55,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { projectName, batchIndex, totalBatches, batch, keySlot } = body as {
+    const { projectName, batchIndex, totalBatches, batch, keySlot, attempt = 0 } = body as {
       projectName: string;
       batchIndex: number;
       totalBatches: number;
       batch: SmartBatch;
       keySlot?: number;
+      attempt?: number;
     };
 
-    console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${projectName}`);
+    console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${projectName} (attempt ${attempt + 1})`);
     console.log(`[Smart Batch ${batchIndex}] Sections: ${batch.sections?.length || 0}, Static findings: ${batch.staticFindings?.length || 0}`);
 
     if (!batch || (!batch.sections?.length && !batch.staticFindings?.length)) {
@@ -84,12 +85,14 @@ export async function POST(req: NextRequest) {
     let model: string;
     
     try {
+      // Try with retry logic built into chatCompletion (already has 2 retries)
       const result = await chatCompletion(
         [
           { role: "system", content: SMART_SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        apiKey
+        apiKey,
+        2 // 2 retries at OpenRouter level
       );
       content = result.content;
       model = result.model;
@@ -99,12 +102,13 @@ export async function POST(req: NextRequest) {
       const message = error instanceof Error ? error.message : "AI request failed";
       console.error(`[Smart Batch ${batchIndex}] ✗ AI request failed:`, message);
       
-      // Return empty findings instead of failing
+      // Return empty findings instead of failing - client will retry
       return NextResponse.json({
         findings: [],
         batchIndex,
         modelUsed: "error",
         error: message,
+        retryable: true, // Signal that client should retry
       });
     }
 

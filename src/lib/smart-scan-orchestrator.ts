@@ -31,7 +31,8 @@ export interface SmartScanResult {
   };
 }
 
-const PARALLEL_AI_CALLS = 3;
+const PARALLEL_AI_CALLS = 3; // Use all 3 API keys in parallel
+const DEEP_SCAN_PARALLEL = 12; // Deep scan uses 12 parallel workers (4x multiplier)
 
 export async function runSmartScan(
   projectName: string,
@@ -231,29 +232,33 @@ async function runAIAnalysis(
   
   const aiFindings: AIFinding[] = [];
   const phaseLabel = mode === "quick" ? "AI review" : "AI deep review";
+  
+  // Use more parallel workers for deep scan
+  const parallelWorkers = mode === "deep" ? DEEP_SCAN_PARALLEL : PARALLEL_AI_CALLS;
+  console.log(`[AI Analysis] Using ${parallelWorkers} parallel workers`);
 
-  for (let i = 0; i < batches.length; i += PARALLEL_AI_CALLS) {
-    const slice = batches.slice(i, i + PARALLEL_AI_CALLS);
+  for (let i = 0; i < batches.length; i += parallelWorkers) {
+    const slice = batches.slice(i, i + parallelWorkers);
     const done = Math.min(i + slice.length, batches.length);
     
     const progressPct = 45 + Math.round((done / batches.length) * 30);
     onProgress(
       phaseLabel,
       progressPct,
-      `Round ${Math.floor(i / PARALLEL_AI_CALLS) + 1} · ${done}/${batches.length} segments · 3 parallel workers`
+      `Round ${Math.floor(i / parallelWorkers) + 1} · ${done}/${batches.length} segments · ${parallelWorkers} parallel workers`
     );
 
-    console.log(`[AI Analysis] Processing batch round ${Math.floor(i / PARALLEL_AI_CALLS) + 1}, batches ${i}-${i + slice.length - 1}`);
+    console.log(`[AI Analysis] Processing batch round ${Math.floor(i / parallelWorkers) + 1}, batches ${i}-${i + slice.length - 1}`);
 
     const promises = slice.map((batch, j) =>
-      analyzeBatchWithAI(projectName, i + j, batches.length, batch, j)
+      analyzeBatchWithAI(projectName, i + j, batches.length, batch, j % 3) // Rotate through 3 keys
     );
 
     const results = await Promise.all(promises);
     const newFindings = results.flat();
     aiFindings.push(...newFindings);
     
-    console.log(`[AI Analysis] Round ${Math.floor(i / PARALLEL_AI_CALLS) + 1} complete: ${newFindings.length} findings`);
+    console.log(`[AI Analysis] Round ${Math.floor(i / parallelWorkers) + 1} complete: ${newFindings.length} findings`);
   }
 
   console.log(`[AI Analysis] ✓ Complete: ${aiFindings.length} total AI findings`);
@@ -350,65 +355,102 @@ async function analyzeBatchWithAI(
   batchIndex: number,
   totalBatches: number,
   batch: SmartBatch,
-  parallelSlot: number
+  keySlot: number
 ): Promise<AIFinding[]> {
   
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 seconds - slightly less than server timeout
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
   
-  try {
-    const res = await fetch("/api/scan/smart-batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectName,
-        batchIndex,
-        totalBatches,
-        batch,
-        keySlot: parallelSlot % PARALLEL_AI_CALLS,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      let errorMessage = `HTTP ${res.status}`;
+  // Try with retries and exponential backoff
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 seconds
+    
+    try {
+      console.log(`[Batch ${batchIndex}] Attempt ${attempt + 1}/${MAX_RETRIES} using key slot ${keySlot}`);
       
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorMessage;
-      } catch {
-        errorMessage = errorText.substring(0, 200);
-      }
-      
-      console.error(`Batch ${batchIndex} failed:`, errorMessage);
-      return []; // Continue with other batches
-    }
+      const res = await fetch("/api/scan/smart-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectName,
+          batchIndex,
+          totalBatches,
+          batch,
+          keySlot,
+          attempt, // Pass attempt number for server-side retry logic
+        }),
+        signal: controller.signal,
+      });
 
-    const data = await res.json();
-    
-    // Validate that findings have proper evidence field
-    const findings = (data.findings || []).map((f: any) => ({
-      ...f,
-      evidence: typeof f.evidence === 'string' ? f.evidence : String(f.evidence || ''),
-    }));
-    
-    return findings;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        console.warn(`Batch ${batchIndex} timed out after 55s, skipping...`);
-      } else {
-        console.error(`Batch ${batchIndex} failed:`, error.message);
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        let errorMessage = `HTTP ${res.status}`;
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText.substring(0, 200);
+        }
+        
+        // Check if it's a retryable error
+        if (res.status === 429 || res.status === 503 || res.status === 504) {
+          console.warn(`[Batch ${batchIndex}] Retryable error (${res.status}), attempt ${attempt + 1}/${MAX_RETRIES}`);
+          lastError = new Error(errorMessage);
+          
+          // Exponential backoff: 2s, 4s, 8s
+          const backoffMs = Math.pow(2, attempt) * 2000;
+          console.log(`[Batch ${batchIndex}] Waiting ${backoffMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          continue; // Retry
+        }
+        
+        // Non-retryable error
+        console.error(`[Batch ${batchIndex}] Non-retryable error:`, errorMessage);
+        return []; // Skip this batch
+      }
+
+      const data = await res.json();
+      
+      // Validate that findings have proper evidence field
+      const findings = (data.findings || []).map((f: any) => ({
+        ...f,
+        evidence: typeof f.evidence === 'string' ? f.evidence : String(f.evidence || ''),
+      }));
+      
+      console.log(`[Batch ${batchIndex}] ✓ Success: ${findings.length} findings`);
+      return findings;
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.warn(`[Batch ${batchIndex}] Timeout on attempt ${attempt + 1}/${MAX_RETRIES}`);
+          lastError = error;
+          
+          // Wait before retry
+          const backoffMs = Math.pow(2, attempt) * 1000;
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          continue; // Retry
+        } else {
+          console.error(`[Batch ${batchIndex}] Error on attempt ${attempt + 1}:`, error.message);
+          lastError = error;
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue; // Retry
+        }
       }
     }
-    
-    return []; // Continue with other batches
   }
+  
+  // All retries failed
+  console.error(`[Batch ${batchIndex}] ✗ All ${MAX_RETRIES} attempts failed. Last error:`, lastError?.message);
+  return []; // Continue with other batches
 }
 
 function calculateStrictScore(findings: VerifiedFinding[]): number {
