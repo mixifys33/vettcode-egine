@@ -712,6 +712,16 @@ export function runStaticAnalysis(
         // Get evidence (the matched line)
         const evidence = lines[lineNumber - 1]?.trim() || match[0];
 
+        // Get surrounding context for smart validation
+        const contextStart = Math.max(0, lineNumber - 10);
+        const contextEnd = Math.min(lines.length, lineNumber + 10);
+        const context = lines.slice(contextStart, contextEnd).join("\n");
+
+        // Smart context-aware validation - filter false positives
+        if (isFalsePositive(pattern.id, evidence, context, file.path)) {
+          continue; // Skip this finding
+        }
+
         // Create unique ID for this specific finding
         const uniqueId = `${pattern.id}-${file.path}-${lineNumber}`;
         if (seenIds.has(uniqueId)) continue;
@@ -733,6 +743,177 @@ export function runStaticAnalysis(
   }
 
   return findings;
+}
+
+/**
+ * Smart context-aware validation to filter false positives
+ * Returns true if the finding is a false positive and should be skipped
+ */
+function isFalsePositive(
+  patternId: string,
+  evidence: string,
+  context: string,
+  filePath: string
+): boolean {
+  // Check if this is a scanner/analyzer file (contains detection patterns, not actual issues)
+  const isScannerFile = /(?:analyzer|scanner|detector|pattern|rule|check)\.(?:ts|js)/i.test(filePath);
+  const isStaticAnalyzerFile = filePath.includes('static-analyzer');
+  const isAstExtractorFile = filePath.includes('ast-extractor');
+  
+  switch (patternId) {
+    case "eval-usage":
+      // False positive if it's just a string pattern for detection
+      if (isScannerFile || isStaticAnalyzerFile || isAstExtractorFile) {
+        // Check if eval appears in a string, array, or regex pattern
+        if (/["'`].*eval.*["'`]|\/.*eval.*\/|regex.*eval/i.test(context)) {
+          return true; // It's a detection pattern, not actual eval usage
+        }
+      }
+      // Check if it's in a comment
+      if (/\/\/.*eval|\/\*.*eval.*\*\//i.test(evidence)) {
+        return true;
+      }
+      break;
+
+    case "hardcoded-password":
+      // False positive if password is dynamically generated
+      if (/password.*[`$]\{|password.*\+|password.*concat/i.test(evidence)) {
+        return true; // Dynamic password generation
+      }
+      // False positive if it's a template or placeholder
+      if (/google_\$\{|oauth_\$\{|auth_\$\{/i.test(evidence)) {
+        return true; // OAuth-based dynamic password
+      }
+      // False positive if it's in a type definition or interface
+      if (/interface|type\s+\w+|:\s*string|:\s*Password/i.test(context)) {
+        return true;
+      }
+      break;
+
+    case "hardcoded-secret-api-key":
+    case "hardcoded-jwt-secret":
+      // False positive if it's an example or placeholder
+      if (/example|placeholder|your-key-here|xxx|sk-or-v1-your/i.test(evidence)) {
+        return true;
+      }
+      // False positive if it's in .env.example file
+      if (filePath.includes('.env.example') || filePath.includes('.env.sample')) {
+        return true;
+      }
+      break;
+
+    case "logging-sensitive-data":
+      // False positive if logging only checks existence (SET/NOT SET)
+      if (/\?\s*['"]SET['"]|['"]NOT SET['"]|process\.env\.\w+\s*\?/i.test(context)) {
+        return true; // Only logging if key exists, not the actual value
+      }
+      // False positive if it's checking for presence
+      if (/console\.(log|error)\([^)]*\?\s*['"]SET['"]/i.test(context)) {
+        return true;
+      }
+      break;
+
+    case "file-upload-no-size-limit":
+      // False positive if size limits are enforced elsewhere in the codebase
+      // Check if the file has size validation logic
+      if (/MAX_FILE_SIZE|MAX_.*_BYTES|maxSize|maxFileSize|file\.size\s*[<>]/i.test(context)) {
+        return true; // Size limits are implemented
+      }
+      // False positive for UI components (validation happens server-side)
+      if (filePath.includes('/components/') && /input.*type.*file|FileList|webkitdirectory/i.test(context)) {
+        return true; // UI component, validation is server-side
+      }
+      // False positive if it's just a type definition or interface
+      if (/interface|type\s+\w+|onFolderSelect|onZipSelect/i.test(evidence)) {
+        return true;
+      }
+      break;
+
+    case "xss-dangerouslysetinnerhtml":
+    case "xss-innerhtml":
+      // False positive in React components (React auto-escapes)
+      if (/value=\{|onChange=\{|<input|<textarea/i.test(context)) {
+        return true; // React controlled input, auto-escaped
+      }
+      // False positive if content is sanitized
+      if (/DOMPurify|sanitize|escape|xss/i.test(context)) {
+        return true;
+      }
+      break;
+
+    case "console-log-production":
+      // False positive if gated by NODE_ENV check
+      if (/NODE_ENV.*development|if.*development|process\.env\.NODE_ENV/i.test(context)) {
+        return true; // Gated by environment check
+      }
+      // False positive if it's error logging (console.error is acceptable)
+      if (/console\.error|console\.warn/i.test(evidence)) {
+        return true;
+      }
+      break;
+
+    case "missing-timeout":
+      // False positive if timeout is set via config or interceptor
+      if (/timeout|AbortController|signal|controller\.abort/i.test(context)) {
+        return true; // Timeout is implemented
+      }
+      break;
+
+    case "missing-rate-limit":
+      // False positive if rate limiting is handled by middleware or proxy
+      if (/middleware|proxy|nginx|cloudflare|vercel/i.test(context)) {
+        return true; // Rate limiting handled at infrastructure level
+      }
+      break;
+
+    case "api-no-input-validation":
+      // False positive if validation happens in the function
+      if (/validate|schema|zod|joi|yup|check|sanitize/i.test(context)) {
+        return true; // Validation is present
+      }
+      break;
+
+    case "missing-auth-check":
+      // False positive if auth is handled by framework or middleware
+      if (/middleware|auth|protect|guard|verify|check.*auth/i.test(context)) {
+        return true; // Auth middleware is present
+      }
+      break;
+
+    case "db-query-in-loop":
+      // False positive if it's a small fixed array
+      if (/\.slice\(0,\s*[1-5]\)|\.take\([1-5]\)|length\s*[<<=]\s*[1-5]/i.test(context)) {
+        return true; // Limited to small number of items
+      }
+      break;
+
+    case "magic-numbers":
+      // False positive for HTTP status codes
+      if (/\b(?:200|201|204|400|401|403|404|500|503)\b/.test(evidence)) {
+        return true; // HTTP status code
+      }
+      // False positive for common constants
+      if (/\b(?:1000|1024|60|24|365)\b/.test(evidence)) {
+        return true; // Common time/size constants
+      }
+      break;
+
+    case "any-type-typescript":
+      // False positive if it's intentional (error handling, unknown types)
+      if (/catch.*any|error.*any|unknown.*any/i.test(context)) {
+        return true; // Intentional any for error handling
+      }
+      break;
+
+    case "todo-fixme":
+      // False positive if it's in a comment explaining something (not actual TODO)
+      if (/\/\/.*example|\/\/.*note|\/\/.*explanation/i.test(evidence)) {
+        return true;
+      }
+      break;
+  }
+
+  return false; // Not a false positive, report it
 }
 
 export function shouldSendToAI(finding: StaticFinding): boolean {
