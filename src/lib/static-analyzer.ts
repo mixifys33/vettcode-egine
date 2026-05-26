@@ -202,6 +202,12 @@ const SECURITY_PATTERNS: Pattern[] = [
     description: "Async operation without error handling can crash the application",
     confidence: "low",
   },
+  {
+    id: "console-log-production",
+    regex: /console\.(?:log|debug|info)\(/gi,
+    severity: "low",
+    category: "production",
+    title: "Console Statement in Production Code",
     description: "Console statements should be removed or replaced with proper logging",
     confidence: "high",
   },
