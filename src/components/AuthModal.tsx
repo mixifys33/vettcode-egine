@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { setAuthUser, resetScanCount } from "@/lib/auth";
 
 interface AuthModalProps {
@@ -11,6 +11,8 @@ interface AuthModalProps {
 export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "register" | "verify">("login");
   const [loading, setLoading] = useState(false);
+  const [googleAuthInProgress, setGoogleAuthInProgress] = useState(false);
+  const [googleAuthStep, setGoogleAuthStep] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -22,6 +24,15 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  
+  // Prevent modal close during Google auth
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (googleAuthInProgress) {
+      // Don't close modal during Google authentication
+      return;
+    }
+    onClose();
+  };
   
   // Network timeout helper
   const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 10000) => {
@@ -68,6 +79,8 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   async function handleGoogleLogin() {
     setError(null);
     setLoading(true);
+    setGoogleAuthInProgress(true);
+    setGoogleAuthStep("Opening Google Sign-In...");
 
     try {
       // Use Google Sign-In with popup
@@ -81,24 +94,39 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       google.accounts.id.initialize({
         client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
         callback: handleGoogleCallback,
+        cancel_on_tap_outside: false, // Don't cancel if user clicks outside
       });
 
       // Prompt the user to select a Google account
-      google.accounts.id.prompt();
+      google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // User closed the popup or it wasn't shown
+          setGoogleAuthInProgress(false);
+          setGoogleAuthStep("");
+          setLoading(false);
+          setError("Google Sign-In was cancelled. Please try again.");
+        }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google login failed");
       setLoading(false);
+      setGoogleAuthInProgress(false);
+      setGoogleAuthStep("");
     }
   }
 
   async function handleGoogleCallback(response: any) {
     try {
+      setGoogleAuthStep("Verifying your Google account...");
+      
       // Decode the JWT token from Google
       const credential = response.credential;
       const payload = JSON.parse(atob(credential.split('.')[1]));
       
       const googleEmail = payload.email;
       const googleName = payload.name;
+      
+      setGoogleAuthStep("Checking your account...");
       
       // Check if seller already exists (try to login first)
       const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/login`, {
@@ -112,6 +140,8 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
       if (loginRes.ok) {
         // Seller exists - login successful
+        setGoogleAuthStep("Signing you in...");
+        
         const loginData = await loginRes.json();
         
         const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
@@ -125,9 +155,15 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         });
 
         resetScanCount();
-        onSuccess();
+        
+        setGoogleAuthStep("Success! Redirecting...");
+        setTimeout(() => {
+          onSuccess();
+        }, 500);
       } else {
         // Seller doesn't exist - register new seller
+        setGoogleAuthStep("Creating your account...");
+        
         const randomPhone = `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`;
         
         const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/register`, {
@@ -138,14 +174,22 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             email: googleEmail.toLowerCase(),
             phoneNumber: randomPhone, // Placeholder phone
             password: `google_oauth_${payload.sub}`, // Google OAuth identifier
+            skipOTP: true, // Skip OTP for Google users
           }),
         });
 
         const registerData = await registerRes.json();
 
         if (!registerRes.ok) {
+          // Handle specific error cases
+          if (registerData.message?.includes("already exists") || registerData.error?.includes("already exists")) {
+            // Email exists but password doesn't match - this shouldn't happen
+            throw new Error("An account with this email already exists. Please try signing in instead.");
+          }
           throw new Error(registerData.message || registerData.error || "Registration failed");
         }
+
+        setGoogleAuthStep("Finalizing your account...");
 
         // Check if account was created directly (Google OAuth users skip OTP)
         if (registerData.seller && registerData.seller.id) {
@@ -161,9 +205,15 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           });
 
           resetScanCount();
-          onSuccess();
+          
+          setGoogleAuthStep("Success! Redirecting...");
+          setTimeout(() => {
+            onSuccess();
+          }, 500);
         } else {
           // Old flow - needs OTP verification (shouldn't happen for Google users)
+          setGoogleAuthStep("Verifying your account...");
+          
           const verifyRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/verify`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -187,7 +237,11 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             });
 
             resetScanCount();
-            onSuccess();
+            
+            setGoogleAuthStep("Success! Redirecting...");
+            setTimeout(() => {
+              onSuccess();
+            }, 500);
           } else {
             throw new Error("Failed to verify Google account");
           }
@@ -195,7 +249,8 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google authentication failed");
-    } finally {
+      setGoogleAuthInProgress(false);
+      setGoogleAuthStep("");
       setLoading(false);
     }
   }
@@ -358,22 +413,28 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div>
-            <h2>{titles[mode]}</h2>
-            <p className="modal-sub">{subtitles[mode]}</p>
+    <>
+      <div className="modal-overlay" onClick={handleOverlayClick}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <div>
+              <h2>{titles[mode]}</h2>
+              <p className="modal-sub">{subtitles[mode]}</p>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={googleAuthInProgress ? undefined : onClose}
+              aria-label="Close"
+              disabled={googleAuthInProgress}
+              style={{ 
+                opacity: googleAuthInProgress ? 0.5 : 1,
+                cursor: googleAuthInProgress ? 'not-allowed' : 'pointer'
+              }}
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
 
         {mode === "login" && (
           <form onSubmit={handleLogin} className="auth-form">
@@ -592,5 +653,77 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         </p>
       </div>
     </div>
+    
+    {/* Google Authentication Loading Overlay */}
+    {googleAuthInProgress && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10001,
+        backdropFilter: 'blur(4px)',
+      }}>
+        <div style={{
+          background: 'var(--bg-elevated)',
+          padding: '2rem 3rem',
+          borderRadius: '12px',
+          textAlign: 'center',
+          maxWidth: '400px',
+          border: '1px solid var(--border)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        }}>
+          {/* Animated spinner */}
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid var(--border)',
+            borderTop: '4px solid var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1.5rem',
+          }} />
+          
+          <h3 style={{
+            margin: '0 0 0.5rem',
+            fontSize: '1.25rem',
+            color: 'var(--text)',
+          }}>
+            Authenticating with Google
+          </h3>
+          
+          <p style={{
+            margin: 0,
+            color: 'var(--muted)',
+            fontSize: '0.95rem',
+          }}>
+            {googleAuthStep || "Please wait..."}
+          </p>
+          
+          <p style={{
+            margin: '1rem 0 0',
+            color: 'var(--muted)',
+            fontSize: '0.85rem',
+            fontStyle: 'italic',
+          }}>
+            Please don't close this window
+          </p>
+        </div>
+      </div>
+    )}
+    
+    {/* Add spinner animation */}
+    <style jsx>{`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `}</style>
+  </>
   );
 }
