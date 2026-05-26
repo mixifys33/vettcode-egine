@@ -1136,22 +1136,6 @@ function identifyFilePurpose(filePath: string, context: string): 'scanner' | 'an
   return 'normal';
 }
 
-function isPatternDefinition(evidence: string, context: string): boolean {
-  // Check if the code is defining a pattern, not using it
-  const patternIndicators = [
-    /regex\s*:/i,
-    /RegExp\(/i,
-    /\/.*\/[gimuy]/,
-    /pattern\s*:/i,
-    /["'`].*(?:eval|exec|query|password).*["'`]/,
-    /id\s*:\s*["'][\w-]+["']/,
-    /severity\s*:/i,
-    /const\s+\w+_PATTERNS\s*=/i,
-  ];
-  
-  return patternIndicators.some(indicator => indicator.test(context));
-}
-
 // ============================================
 // HELPER FUNCTIONS: Semantic Validators
 // ============================================
