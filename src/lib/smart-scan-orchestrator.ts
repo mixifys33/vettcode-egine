@@ -89,6 +89,7 @@ export async function runSmartScan(
       ? staticFindings.filter(shouldSendToAI).slice(0, 12)
       : staticFindings.filter(shouldSendToAI);
 
+  // Phase 3: AI Analysis (deep reasoning on extracted code)
   onProgress(
     mode === "quick" ? "AI review" : "AI deep review",
     45,
@@ -97,13 +98,21 @@ export async function runSmartScan(
       : "Parallel review across extracted regions…"
   );
 
-  const aiFindings = await runAIAnalysis(
-    projectName,
-    extractedSections,
-    staticForAi,
-    onProgress,
-    mode
-  );
+  let aiFindings: AIFinding[] = [];
+  try {
+    aiFindings = await runAIAnalysis(
+      projectName,
+      extractedSections,
+      staticForAi,
+      onProgress,
+      mode
+    );
+  } catch (error) {
+    console.error('[AI Analysis] Critical error in runAIAnalysis:', error);
+    // Continue with empty AI findings rather than crashing
+    aiFindings = [];
+    onProgress("AI review", 75, "AI analysis encountered errors, continuing with static findings only");
+  }
 
   onProgress("AI review", 75, `${aiFindings.length} additional findings`);
 
@@ -229,10 +238,16 @@ async function runAIAnalysis(
     return [];
   }
 
-  const batches = capSmartBatches(
-    createSmartBatches(extractedSections, lowConfidenceStaticFindings, mode),
-    mode === "quick" ? 10 : 48
-  );
+  let batches: SmartBatch[] = [];
+  try {
+    batches = capSmartBatches(
+      createSmartBatches(extractedSections, lowConfidenceStaticFindings, mode),
+      mode === "quick" ? 10 : 48
+    );
+  } catch (error) {
+    console.error('[AI Analysis] Error creating batches:', error);
+    return [];
+  }
   
   console.log(`[AI Analysis] Created ${batches.length} batches for processing`);
   
@@ -257,14 +272,22 @@ async function runAIAnalysis(
     console.log(`[AI Analysis] Processing batch round ${Math.floor(i / parallelWorkers) + 1}, batches ${i}-${i + slice.length - 1}`);
 
     const promises = slice.map((batch, j) =>
-      analyzeBatchWithAI(projectName, i + j, batches.length, batch, j % 3) // Rotate through 3 keys
+      analyzeBatchWithAI(projectName, i + j, batches.length, batch, j % 3).catch(error => {
+        console.error(`[AI Analysis] Batch ${i + j} failed with error:`, error);
+        return []; // Return empty array on error to continue with other batches
+      })
     );
 
-    const results = await Promise.all(promises);
-    const newFindings = results.flat();
-    aiFindings.push(...newFindings);
-    
-    console.log(`[AI Analysis] Round ${Math.floor(i / parallelWorkers) + 1} complete: ${newFindings.length} findings`);
+    try {
+      const results = await Promise.all(promises);
+      const newFindings = results.flat();
+      aiFindings.push(...newFindings);
+      
+      console.log(`[AI Analysis] Round ${Math.floor(i / parallelWorkers) + 1} complete: ${newFindings.length} findings`);
+    } catch (error) {
+      console.error(`[AI Analysis] Error in batch round ${Math.floor(i / parallelWorkers) + 1}:`, error);
+      // Continue with next round
+    }
   }
 
   console.log(`[AI Analysis] ✓ Complete: ${aiFindings.length} total AI findings`);

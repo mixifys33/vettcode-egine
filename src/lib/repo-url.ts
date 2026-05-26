@@ -47,6 +47,43 @@ export function parseRepoUrl(input: string): ParsedRemoteRepo | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
+  // SSRF Protection: Block private IP ranges and localhost
+  const isPrivateOrLocalhost = (hostname: string): boolean => {
+    // Remove port if present
+    const host = hostname.split(':')[0].toLowerCase();
+    
+    // Block localhost variations
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return true;
+    }
+    
+    // Block IPv6 localhost
+    if (host === '::1' || host === '::' || host.startsWith('fe80:')) {
+      return true;
+    }
+    
+    // Block private IPv4 ranges
+    const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4Match) {
+      const [, a, b, c, d] = ipv4Match.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) return true;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return true;
+      // 169.254.0.0/16 (link-local)
+      if (a === 169 && b === 254) return true;
+    }
+    
+    // Block internal domains
+    if (host.endsWith('.local') || host.endsWith('.internal')) {
+      return true;
+    }
+    
+    return false;
+  };
+
   if (!trimmed.startsWith("gitlab:") && !trimmed.startsWith("bitbucket:")) {
     const gh = trimmed.match(
       /^(?:github:)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:#([a-zA-Z0-9_./-]+))?$/
@@ -89,8 +126,29 @@ export function parseRepoUrl(input: string): ParsedRemoteRepo | null {
     const url = trimmed.startsWith("http")
       ? new URL(trimmed)
       : new URL(`https://${trimmed}`);
+    
+    // SSRF Protection: Validate hostname
+    if (isPrivateOrLocalhost(url.hostname)) {
+      console.warn(`[SSRF Protection] Blocked private/internal URL: ${url.hostname}`);
+      return null;
+    }
+    
     const host = normalizeHost(url.hostname);
     const hostname = url.hostname.replace(/^www\./, "");
+
+    // Only allow known public Git hosting providers
+    const allowedHosts = ['github.com', 'gitlab.com', 'bitbucket.org'];
+    const isAllowedHost = allowedHosts.some(allowed => 
+      hostname === allowed || hostname.endsWith(`.${allowed}`)
+    );
+    
+    // Also allow self-hosted GitLab/Bitbucket instances (but still block private IPs)
+    const isGitHost = hostname.includes('gitlab') || hostname.includes('bitbucket');
+    
+    if (!isAllowedHost && !isGitHost) {
+      console.warn(`[SSRF Protection] Blocked non-Git hosting URL: ${hostname}`);
+      return null;
+    }
 
     if (hostname === "github.com") return parseGitHubPath(host, url);
     if (hostname === "gitlab.com" || hostname.includes("gitlab"))

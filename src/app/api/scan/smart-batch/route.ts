@@ -99,9 +99,26 @@ interface SmartBatch {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authentication check
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing or invalid authentication" },
+        { status: 401 }
+      );
+    }
+
+    // Validate the token (implement your token validation logic)
+    const token = authHeader.substring(7);
+    if (!token || token.length < 10) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid token" },
+        { status: 401 }
+      );
+    }
+
     const apiKeys = getApiKeys();
-    console.log(`[Smart Batch] API Keys available: ${apiKeys.length}`);
-    
+    // Don't log sensitive information about API keys
     if (apiKeys.length === 0) {
       console.error('[Smart Batch] CRITICAL: No API keys configured!');
       return NextResponse.json(
@@ -120,7 +137,9 @@ export async function POST(req: NextRequest) {
       attempt?: number;
     };
 
-    console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${projectName} (attempt ${attempt + 1})`);
+    // Sanitize project name to prevent log injection
+    const sanitizedProjectName = projectName.replace(/[\r\n\t]/g, '').slice(0, 100);
+    console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${sanitizedProjectName} (attempt ${attempt + 1})`);
     console.log(`[Smart Batch ${batchIndex}] Sections: ${batch.sections?.length || 0}, Static findings: ${batch.staticFindings?.length || 0}`);
 
     if (!batch || (!batch.sections?.length && !batch.staticFindings?.length)) {

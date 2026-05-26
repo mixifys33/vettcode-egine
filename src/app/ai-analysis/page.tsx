@@ -4,6 +4,16 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { VettReport } from "@/lib/types";
 
+// Sanitize text to prevent XSS
+function sanitizeText(text: string): string {
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
 function AIAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -414,27 +424,27 @@ function AIAnalysisContent() {
                     )}
                   </div>
 
-                  <h3 className="finding-title">{finding.title}</h3>
+                  <h3 className="finding-title">{sanitizeText(finding.title)}</h3>
                   
                   <p style={{ fontSize: "0.9rem", color: "var(--text)", marginBottom: "1rem", lineHeight: "1.6" }}>
-                    {finding.description}
+                    {sanitizeText(finding.description)}
                   </p>
 
                   {finding.evidence && (
                     <div className="finding-section">
                       <strong>Evidence</strong>
-                      <pre className="evidence">{finding.evidence}</pre>
+                      <pre className="evidence">{sanitizeText(finding.evidence)}</pre>
                     </div>
                   )}
 
                   <div className="finding-section">
                     <strong>Remediation</strong>
-                    <p>{finding.mitigation}</p>
+                    <p>{sanitizeText(finding.mitigation)}</p>
                   </div>
 
                   <div className="finding-section">
                     <strong>Prevention</strong>
-                    <p>{finding.prevention}</p>
+                    <p>{sanitizeText(finding.prevention)}</p>
                   </div>
                 </article>
               ))}

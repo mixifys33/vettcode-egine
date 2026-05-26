@@ -176,14 +176,30 @@ export function ReportView({
   // Auto-open modal if setting is enabled and score >= 60
   useEffect(() => {
     if (autoPreListEnabled && report.score >= 60) {
-      // Check if user is authenticated
+      // Check if user is authenticated with fresh token
       const token = localStorage.getItem("sellerToken");
       if (token) {
-        // Small delay to let the report render first
-        const timer = setTimeout(() => {
-          setShowPreListModal(true);
-        }, 1000);
-        return () => clearTimeout(timer);
+        // Validate token freshness
+        try {
+          const tokenParts = token.split('_');
+          if (tokenParts.length >= 3) {
+            const timestamp = parseInt(tokenParts[2], 10);
+            const tokenAge = Date.now() - timestamp;
+            const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+            
+            if (tokenAge <= MAX_TOKEN_AGE) {
+              // Token is fresh, open modal
+              const timer = setTimeout(() => {
+                setShowPreListModal(true);
+              }, 1000);
+              return () => clearTimeout(timer);
+            } else {
+              console.warn('[Auto Pre-List] Token expired, skipping auto-open');
+            }
+          }
+        } catch (error) {
+          console.error('[Auto Pre-List] Token validation error:', error);
+        }
       }
     }
   }, [autoPreListEnabled, report.score]);
@@ -295,7 +311,7 @@ export function ReportView({
   
   // Handle monetize button click - check auth and open modal
   const handleMonetizeClick = () => {
-    // Check if user is authenticated
+    // Check if user is authenticated with fresh token
     const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
     
     if (!token) {
@@ -306,8 +322,44 @@ export function ReportView({
       window.location.href = "https://vettcodedev.vercel.app/login";
       return;
     }
+    
+    // Validate token freshness (check if token is not expired)
+    try {
+      const tokenParts = token.split('_');
+      if (tokenParts.length >= 3) {
+        const timestamp = parseInt(tokenParts[2], 10);
+        const tokenAge = Date.now() - timestamp;
+        const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+        
+        if (tokenAge > MAX_TOKEN_AGE) {
+          // Token expired, redirect to login
+          console.warn('[Auth] Token expired, redirecting to login');
+          localStorage.removeItem("sellerToken");
+          localStorage.removeItem("vettcode_seller_token");
+          localStorage.removeItem("seller_token");
+          
+          const currentUrl = window.location.href;
+          const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
+          localStorage.setItem("vettcode_return_url", scannerUrl);
+          window.location.href = "https://vettcodedev.vercel.app/login";
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('[Auth] Token validation error:', error);
+      // If token format is invalid, treat as unauthenticated
+      localStorage.removeItem("sellerToken");
+      localStorage.removeItem("vettcode_seller_token");
+      localStorage.removeItem("seller_token");
+      
+      const currentUrl = window.location.href;
+      const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
+      localStorage.setItem("vettcode_return_url", scannerUrl);
+      window.location.href = "https://vettcodedev.vercel.app/login";
+      return;
+    }
 
-    // User is authenticated, open modal
+    // User is authenticated with fresh token, open modal
     setShowPreListModal(true);
   };
 

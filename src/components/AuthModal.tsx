@@ -22,6 +22,48 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  
+  // Network timeout helper
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 10000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout. Please check your connection and try again.');
+      }
+      throw error;
+    }
+  };
+  
+  // Retry helper with exponential backoff
+  const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 2) => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fetchWithTimeout(url, options);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Network request failed');
+        
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s
+          const backoffMs = Math.pow(2, attempt) * 1000;
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
+    }
+    
+    throw lastError;
+  };
 
   async function handleGoogleLogin() {
     setError(null);
@@ -59,7 +101,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       const googleName = payload.name;
       
       // Check if seller already exists (try to login first)
-      const loginRes = await fetch(`${BACKEND_URL}/api/sellers/login`, {
+      const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,7 +130,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         // Seller doesn't exist - register new seller
         const randomPhone = `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`;
         
-        const registerRes = await fetch(`${BACKEND_URL}/api/sellers/register`, {
+        const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -122,7 +164,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           onSuccess();
         } else {
           // Old flow - needs OTP verification (shouldn't happen for Google users)
-          const verifyRes = await fetch(`${BACKEND_URL}/api/sellers/verify`, {
+          const verifyRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/verify`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -165,7 +207,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const registerRes = await fetch(`${BACKEND_URL}/api/sellers/register`, {
+      const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,7 +241,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const verifyRes = await fetch(`${BACKEND_URL}/api/sellers/verify`, {
+      const verifyRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -241,7 +283,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const loginRes = await fetch(`${BACKEND_URL}/api/sellers/login`, {
+      const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -281,7 +323,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const resendRes = await fetch(`${BACKEND_URL}/api/sellers/resend-otp`, {
+      const resendRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),

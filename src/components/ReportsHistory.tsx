@@ -39,7 +39,9 @@ export function ReportsHistory({ currentReportId, onSelectReport, onClose }: Rep
 
   const loadReports = () => {
     const savedReports = getSavedReports();
-    setReports(savedReports);
+    // Limit to prevent OOM - only load most recent 50 reports
+    const limitedReports = savedReports.slice(0, 50);
+    setReports(limitedReports);
   };
 
   const handleDelete = (reportId: string, e: React.MouseEvent) => {
