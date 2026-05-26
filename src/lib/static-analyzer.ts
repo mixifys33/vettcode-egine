@@ -1363,25 +1363,23 @@ function validateDatabaseTransaction(evidence: string, context: string, filePath
 
 function validatePromiseHandling(evidence: string, context: string, filePath: string): boolean {
   // ============================================
-  // CRITICAL FIX: The regex matches function DECLARATIONS
-  // Evidence will be: "async function myFunc() {"
-  // We need to check the CONTEXT (full function body) for error handling
+  // ALL async function/method DECLARATIONS are false positives
+  // Error handling is at the call site, not the declaration
   // ============================================
   
-  // ALWAYS TRUE for function declarations - error handling is at call site or in body
-  // The pattern incorrectly flags the declaration line itself
-  if (/^(?:export\s+)?async\s+function\s+\w+|^async\s+function\s+\w+/i.test(evidence.trim())) {
-    return true; // Function declarations are NEVER the issue
+  const trimmed = evidence.trim();
+  
+  // If the line contains "async function" or "async (" it's a declaration
+  if (trimmed.includes('async function') || /async\s*\(/i.test(trimmed)) {
+    return true; // ALWAYS skip function declarations
   }
   
-  // ALWAYS TRUE for method declarations
-  if (/^(?:export\s+)?async\s+\w+\s*\(/i.test(evidence.trim())) {
-    return true; // Method declarations are NEVER the issue
-  }
-  
-  // ALWAYS TRUE for arrow function assignments
-  if (/^(?:export\s+)?const\s+\w+\s*=\s*async/i.test(evidence.trim())) {
-    return true; // Function assignments are NEVER the issue
+  // If the line contains "Promise.all" or "Promise.race"
+  if (trimmed.includes('Promise.all') || trimmed.includes('Promise.race')) {
+    // Check if there's error handling in context
+    if (context.includes('.catch') || context.includes('try {')) {
+      return true;
+    }
   }
   
   // FALSE POSITIVE: Comments (not actual code)
