@@ -202,12 +202,6 @@ const SECURITY_PATTERNS: Pattern[] = [
     description: "Async operation without error handling can crash the application",
     confidence: "low",
   },
-  {
-    id: "console-log-production",
-    regex: /console\.(?:log|debug|info)\(/gi,
-    severity: "low",
-    category: "production",
-    title: "Console Statement in Production Code",
     description: "Console statements should be removed or replaced with proper logging",
     confidence: "high",
   },
@@ -1363,18 +1357,25 @@ function validateDatabaseTransaction(evidence: string, context: string, filePath
 
 function validatePromiseHandling(evidence: string, context: string, filePath: string): boolean {
   // ============================================
-  // LAYER 1: Structural Analysis - Is this even executable code?
+  // CRITICAL FIX: The regex matches function DECLARATIONS
+  // Evidence will be: "async function myFunc() {"
+  // We need to check the CONTEXT (full function body) for error handling
   // ============================================
   
-  // FALSE POSITIVE: Function/method DECLARATIONS (not invocations)
-  // These define functions - error handling happens at the CALL SITE
-  // Examples:
-  //   - export async function myFunc() { ... }
-  //   - async function helper() { ... }
-  //   - const myFunc = async () => { ... }
-  //   - async myMethod() { ... }
-  if (/^(?:export\s+)?(?:async\s+function|const\s+\w+\s*=\s*async|async\s+\w+\s*\()/i.test(evidence.trim())) {
-    return true;
+  // ALWAYS TRUE for function declarations - error handling is at call site or in body
+  // The pattern incorrectly flags the declaration line itself
+  if (/^(?:export\s+)?async\s+function\s+\w+|^async\s+function\s+\w+/i.test(evidence.trim())) {
+    return true; // Function declarations are NEVER the issue
+  }
+  
+  // ALWAYS TRUE for method declarations
+  if (/^(?:export\s+)?async\s+\w+\s*\(/i.test(evidence.trim())) {
+    return true; // Method declarations are NEVER the issue
+  }
+  
+  // ALWAYS TRUE for arrow function assignments
+  if (/^(?:export\s+)?const\s+\w+\s*=\s*async/i.test(evidence.trim())) {
+    return true; // Function assignments are NEVER the issue
   }
   
   // FALSE POSITIVE: Comments (not actual code)
