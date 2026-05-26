@@ -102,6 +102,7 @@ export async function chatCompletion(
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
+      
       if (nodeEnv === 'development') {
         console.log(`[OpenRouter] Attempt ${attempt + 1}/${retries + 1} - Calling ${OPENROUTER_URL}`);
         console.log(`[OpenRouter] Models: ${JSON.stringify(models)}`);
@@ -152,7 +153,6 @@ export async function chatCompletion(
 
       const content = data.choices?.[0]?.message?.content?.trim();
       
-      const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
       if (nodeEnv === 'development') {
         console.log(`[OpenRouter] Response model: ${data.model || 'unknown'}`);
         console.log(`[OpenRouter] Content length: ${content?.length || 0} chars`);

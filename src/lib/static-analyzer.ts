@@ -1667,13 +1667,13 @@ function validateMemoryLeak(evidence: string, context: string): boolean {
 
 function validateEnvVariable(evidence: string, context: string): boolean {
   // False positive if env var is validated with trim(), default value, or conditional
-  const hasValidation = /\?\.trim\(\)|\|\||??|process\.env\.\w+\s*\?/i.test(evidence);
+  const hasValidation = /\?\.trim\(\)|\|\||\?\?|process\.env\.\w+\s*\?/i.test(evidence);
   
   // False positive if checking NODE_ENV (standard practice)
   const isNodeEnv = /NODE_ENV/.test(evidence);
   
   // False positive if there's a fallback or default value
-  const hasDefault = /\|\|\s*['"]|??\s*['"]/.test(context);
+  const hasDefault = /\|\|\s*['"]|\?\?\s*['"]/.test(context);
   
   return hasValidation || (isNodeEnv && hasDefault);
 }
