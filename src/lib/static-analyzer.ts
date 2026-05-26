@@ -787,11 +787,6 @@ function runPatternsWithGraph(
   patterns: Pattern[],
   graph: ReferenceGraph
 ): StaticFinding[] {
-function runPatternsWithGraph(
-  files: Array<{ path: string; content: string }>,
-  patterns: Pattern[],
-  graph: ReferenceGraph
-): StaticFinding[] {
   console.log('[Static Analysis] Building reference graph...');
   const startTime = Date.now();
   
@@ -1050,6 +1045,13 @@ function isFalsePositive(
       
     case "db-query-in-loop":
       return validateQueryInLoop(evidence, context);
+      
+    case "db-missing-limit":
+    case "db-select-all":
+      return validateDatabaseQuery(evidence, context, filePath, filePurpose);
+      
+    case "promise-all-no-error-handling":
+      return validatePromiseAllErrorHandling(evidence, context);
       
     case "magic-numbers":
       return validateMagicNumbers(evidence, context);
@@ -1420,6 +1422,53 @@ function validateAuthCheck(evidence: string, context: string): boolean {
 function validateQueryInLoop(evidence: string, context: string): boolean {
   // Limited to small number of items
   return /\.slice\(0,\s*[1-5]\)|\.take\([1-5]\)|length\s*[<<=]\s*[1-5]/i.test(context);
+}
+
+function validateDatabaseQuery(evidence: string, context: string, filePath: string, filePurpose: string): boolean {
+  // FALSE POSITIVE: Scanner's own pattern definitions
+  if (filePurpose === 'scanner' || filePurpose === 'analyzer' || filePurpose === 'pattern-definition') {
+    // Check if it's a pattern definition (regex, title, description)
+    if (/regex:|title:|description:|Pattern\[\]|id:\s*['"]db-/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // FALSE POSITIVE: JavaScript array methods (not database queries)
+  // .find() on arrays, not database queries
+  if (/(?:reports|findings|files|items|results|array|list)\.find\(/i.test(evidence)) {
+    return true;
+  }
+  
+  // .filter() on arrays
+  if (/\.filter\(/i.test(evidence)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: In-memory operations
+  if (/const\s+\w+\s*=\s*\w+\.find\(|const\s+\w+\s*=\s*\w+\.filter\(/i.test(evidence)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: Pattern definitions containing "find(" or "SELECT *"
+  if (/regex\s*:|pattern\s*:|\/.*find\(.*\/|\/.*SELECT.*\//i.test(context)) {
+    return true;
+  }
+  
+  return false;
+}
+
+function validatePromiseAllErrorHandling(evidence: string, context: string): boolean {
+  // FALSE POSITIVE: Wrapped in try-catch block
+  if (/try\s*\{[\s\S]*Promise\.all[\s\S]*\}\s*catch/i.test(context)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: Error handling in the calling function
+  if (/catch\s*\([^)]*error/i.test(context)) {
+    return true;
+  }
+  
+  return false;
 }
 
 function validateMagicNumbers(evidence: string, context: string): boolean {
