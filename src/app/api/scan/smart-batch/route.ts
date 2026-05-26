@@ -149,9 +149,9 @@ export async function POST(req: NextRequest) {
 
     const slot = keySlot ?? batchIndex;
     const apiKey = keyForIndex(slot);
-    console.log(`[Smart Batch ${batchIndex}] Using API key slot ${slot}`);
-
-    const userPrompt = buildSmartBatchPrompt(projectName, batchIndex, totalBatches, batch);
+    // Don't log API key slot to prevent key enumeration
+    
+    const userPrompt = buildSmartBatchPrompt(sanitizedProjectName, batchIndex, totalBatches, batch);
 
     console.log(`[Smart Batch ${batchIndex}] Sending request to OpenRouter...`);
     console.log(`[Smart Batch ${batchIndex}] Prompt length: ${userPrompt.length} chars`);
