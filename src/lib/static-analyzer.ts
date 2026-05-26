@@ -721,7 +721,6 @@ const SECURITY_PATTERNS: Pattern[] = [
 export function runEnhancedStaticAnalysis(
   files: Array<{ path: string; content: string }>
 ): EnhancedStaticAnalysisResult {
-  console.log('[Enhanced Static Analysis] Starting comprehensive analysis...');
   const startTime = Date.now();
   
   // 1. Build reference graph
@@ -748,11 +747,6 @@ export function runEnhancedStaticAnalysis(
   const uniqueFindings = deduplicateFindings(allFindings);
   
   const totalTime = Date.now() - startTime;
-  console.log(`[Enhanced Static Analysis] Complete in ${totalTime}ms`);
-  console.log(`[Enhanced Static Analysis] Found ${uniqueFindings.length} issues`);
-  console.log(`  - Pattern-based: ${patternFindings.length}`);
-  console.log(`  - Data flow: ${dataFlowFindings.length}`);
-  console.log(`  - Control flow: ${controlFlowFindings.length}`);
   
   return {
     findings: uniqueFindings,
@@ -788,12 +782,9 @@ function runPatternsWithGraph(
   patterns: Pattern[],
   graph: ReferenceGraph
 ): StaticFinding[] {
-  console.log('[Static Analysis] Building reference graph...');
   const startTime = Date.now();
   
   const graphTime = Date.now() - startTime;
-  console.log(`[Static Analysis] Reference graph built in ${graphTime}ms`);
-  console.log(`[Static Analysis] Indexed ${graph.files.size} files, ${graph.constantsByName.size} constants, ${graph.functionsByName.size} functions`);
   
   const findings: StaticFinding[] = [];
   const seenIds = new Set<string>();
@@ -862,7 +853,6 @@ function runPatternsWithGraph(
   }
 
   const totalTime = Date.now() - startTime;
-  console.log(`[Static Analysis] Complete in ${totalTime}ms - Found ${findings.length} issues`);
 
   return findings;
 }
@@ -1250,13 +1240,11 @@ function validateFileUploadSizeLimit(
   
   // Check if this file or its dependencies have size validation
   if (hasSizeValidationInChain(filePath, graph)) {
-    console.log(`[False Positive] ${filePath} - Size validation found in dependency chain`);
     return true;
   }
   
   // Check if this is just UI wiring (delegates to components with validation)
   if (isUIWiring(filePath, graph)) {
-    console.log(`[False Positive] ${filePath} - UI wiring component (delegates validation)`);
     return true;
   }
   
@@ -1268,7 +1256,6 @@ function validateFileUploadSizeLimit(
   );
   
   if (hasSizeConstant) {
-    console.log(`[False Positive] ${filePath} - Size constants accessible: ${constants.filter(c => c.type === 'size_limit').map(c => c.name).join(', ')}`);
     return true;
   }
   
@@ -1337,7 +1324,6 @@ function validateAuthCheck(
 ): boolean {
   // Check if auth validation exists in dependency chain
   if (hasAuthValidationInChain(filePath, graph)) {
-    console.log(`[False Positive] ${filePath} - Auth validation found in dependency chain`);
     return true;
   }
   

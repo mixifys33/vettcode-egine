@@ -485,5 +485,3 @@ export const ALL_ENHANCED_PATTERNS: Pattern[] = [
   ...ERROR_HANDLING_PATTERNS,
   ...SECURITY_HEADER_PATTERNS,
 ];
-
-console.log(`[Enhanced Patterns] Loaded ${ALL_ENHANCED_PATTERNS.length} additional security patterns`);

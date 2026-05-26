@@ -89,14 +89,10 @@ export function analyzeDataFlow(
 ): DataFlowFinding[] {
   const findings: DataFlowFinding[] = [];
   
-  console.log('[Data Flow] Starting analysis...');
-  
   for (const file of files) {
     const fileFindings = analyzeFileDataFlow(file.path, file.content);
     findings.push(...fileFindings);
   }
-  
-  console.log(`[Data Flow] Found ${findings.length} data flow vulnerabilities`);
   
   return findings;
 }

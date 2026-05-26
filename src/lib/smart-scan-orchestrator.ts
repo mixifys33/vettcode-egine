@@ -256,12 +256,7 @@ async function runAIAnalysis(
   mode: ScanMode
 ): Promise<AIFinding[]> {
   
-  console.log(`[AI Analysis] Starting ${mode} mode analysis`);
-  console.log(`[AI Analysis] Extracted sections: ${extractedSections.length}`);
-  console.log(`[AI Analysis] Low-confidence static findings: ${lowConfidenceStaticFindings.length}`);
-  
   if (extractedSections.length === 0 && lowConfidenceStaticFindings.length === 0) {
-    console.log('[AI Analysis] No content to analyze, skipping AI');
     return [];
   }
 
@@ -272,18 +267,14 @@ async function runAIAnalysis(
       mode === "quick" ? 10 : 48
     );
   } catch (error) {
-    console.error('[AI Analysis] Error creating batches:', error);
     return [];
   }
-  
-  console.log(`[AI Analysis] Created ${batches.length} batches for processing`);
   
   const aiFindings: AIFinding[] = [];
   const phaseLabel = mode === "quick" ? "AI review" : "AI deep review";
   
   // Use more parallel workers for deep scan
   const parallelWorkers = mode === "deep" ? DEEP_SCAN_PARALLEL : PARALLEL_AI_CALLS;
-  console.log(`[AI Analysis] Using ${parallelWorkers} parallel workers`);
 
   for (let i = 0; i < batches.length; i += parallelWorkers) {
     const slice = batches.slice(i, i + parallelWorkers);
@@ -296,11 +287,8 @@ async function runAIAnalysis(
       `Round ${Math.floor(i / parallelWorkers) + 1} · ${done}/${batches.length} segments · ${parallelWorkers} parallel workers`
     );
 
-    console.log(`[AI Analysis] Processing batch round ${Math.floor(i / parallelWorkers) + 1}, batches ${i}-${i + slice.length - 1}`);
-
     const promises = slice.map((batch, j) =>
       analyzeBatchWithAI(projectName, i + j, batches.length, batch, j % 3).catch(error => {
-        console.error(`[AI Analysis] Batch ${i + j} failed with error:`, error);
         return []; // Return empty array on error to continue with other batches
       })
     );
@@ -309,15 +297,11 @@ async function runAIAnalysis(
       const results = await Promise.all(promises);
       const newFindings = results.flat();
       aiFindings.push(...newFindings);
-      
-      console.log(`[AI Analysis] Round ${Math.floor(i / parallelWorkers) + 1} complete: ${newFindings.length} findings`);
     } catch (error) {
-      console.error(`[AI Analysis] Error in batch round ${Math.floor(i / parallelWorkers) + 1}:`, error);
       // Continue with next round
     }
   }
 
-  console.log(`[AI Analysis] ✓ Complete: ${aiFindings.length} total AI findings`);
   return aiFindings;
 }
 
@@ -417,17 +401,31 @@ async function analyzeBatchWithAI(
   const MAX_RETRIES = 3;
   let lastError: Error | null = null;
   
+  // Get auth token from localStorage or session
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+  };
+  
   // Try with retries and exponential backoff
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 seconds
     
     try {
-      console.log(`[Batch ${batchIndex}] Attempt ${attempt + 1}/${MAX_RETRIES}`);
+      const authToken = getAuthToken();
+      const headers: HeadersInit = { 
+        "Content-Type": "application/json"
+      };
+      
+      // Add Bearer token if available
+      if (authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
+      }
       
       const res = await fetch("/api/scan/smart-batch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           projectName,
           batchIndex,
@@ -454,18 +452,15 @@ async function analyzeBatchWithAI(
         
         // Check if it's a retryable error
         if (res.status === 429 || res.status === 503 || res.status === 504) {
-          console.warn(`[Batch ${batchIndex}] Retryable error (${res.status}), attempt ${attempt + 1}/${MAX_RETRIES}`);
           lastError = new Error(errorMessage);
           
           // Exponential backoff: 2s, 4s, 8s
           const backoffMs = Math.pow(2, attempt) * 2000;
-          console.log(`[Batch ${batchIndex}] Waiting ${backoffMs}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, backoffMs));
           continue; // Retry
         }
         
-        // Non-retryable error
-        console.error(`[Batch ${batchIndex}] Non-retryable error:`, errorMessage);
+        // Non-retryable error (including 401)
         return []; // Skip this batch
       }
 
@@ -477,7 +472,6 @@ async function analyzeBatchWithAI(
         evidence: typeof f.evidence === 'string' ? f.evidence : String(f.evidence || ''),
       }));
       
-      console.log(`[Batch ${batchIndex}] ✓ Success: ${findings.length} findings`);
       return findings;
       
     } catch (error) {
@@ -485,7 +479,6 @@ async function analyzeBatchWithAI(
       
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          console.warn(`[Batch ${batchIndex}] Timeout on attempt ${attempt + 1}/${MAX_RETRIES}`);
           lastError = error;
           
           // Wait before retry
@@ -493,7 +486,6 @@ async function analyzeBatchWithAI(
           await new Promise(resolve => setTimeout(resolve, backoffMs));
           continue; // Retry
         } else {
-          console.error(`[Batch ${batchIndex}] Error on attempt ${attempt + 1}:`, error.message);
           lastError = error;
           
           // Wait before retry
@@ -504,8 +496,7 @@ async function analyzeBatchWithAI(
     }
   }
   
-  // All retries failed
-  console.error(`[Batch ${batchIndex}] ✗ All ${MAX_RETRIES} attempts failed. Last error:`, lastError?.message);
+  // All retries failed - return empty array silently
   return []; // Continue with other batches
 }
 

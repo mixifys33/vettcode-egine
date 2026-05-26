@@ -24,16 +24,17 @@ export function analyzeControlFlow(
 ): ControlFlowFinding[] {
   const findings: ControlFlowFinding[] = [];
   
-  console.log('[Control Flow] Starting analysis...');
-  
   for (const file of files) {
-    findings.push(...findUnhandledAsyncErrors(file.path, file.content));
+    // DISABLED: findUnhandledAsyncErrors - fundamentally flawed
+    // It flags function DECLARATIONS instead of actual unhandled promise CALLS
+    // Exported async functions that throw errors are a VALID pattern (error propagation)
+    // The caller is responsible for handling errors, not the function itself
+    // findings.push(...findUnhandledAsyncErrors(file.path, file.content));
+    
     findings.push(...findMissingValidation(file.path, file.content));
     findings.push(...findRaceConditions(file.path, file.content));
     findings.push(...findMissingNullChecks(file.path, file.content));
   }
-  
-  console.log(`[Control Flow] Found ${findings.length} control flow issues`);
   
   return findings;
 }
