@@ -1221,6 +1221,29 @@ function validateFileUploadSizeLimit(
   // FALSE POSITIVE: Imports/exports/types
   if (/^import\s|^export\s|^const\s+\w+\s*=\s*\{|^interface|^type\s+/.test(evidence.trim())) return true;
   
+  // FALSE POSITIVE: UI text strings (not actual code)
+  // Matches: "Click to upload", "Please upload", "Uploads and repository"
+  if (/['"`].*upload.*['"`]|setError\(['"`].*upload/i.test(evidence)) {
+    // Make sure it's not actual upload code
+    if (!/multer|formidable|busboy|multiparty|express-fileupload/.test(evidence)) {
+      return true;
+    }
+  }
+  
+  // FALSE POSITIVE: Comments (not actual code)
+  if (/\/\/.*upload|\/\*.*upload.*\*\//i.test(evidence)) return true;
+  
+  // FALSE POSITIVE: Scanner's own code analyzing upload patterns
+  if (/reference-graph|static-analyzer|enhanced-patterns/.test(filePath)) {
+    // Check if it's pattern detection code, not actual upload handling
+    if (/UploadZone|FileUpload|Dropzone|Upload/.test(evidence) && /test\(|regex|pattern|imports/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // FALSE POSITIVE: HTML attributes and labels (id="upload", htmlFor="upload")
+  if (/id\s*=\s*['"].*upload|htmlFor\s*=\s*['"].*upload/i.test(evidence)) return true;
+  
   // ============================================
   // REFERENCE GRAPH VALIDATION (NEW!)
   // ============================================
