@@ -14,17 +14,33 @@ function headers(): Record<string, string> {
 }
 
 async function defaultBranch(workspace: string, repo: string): Promise<string> {
-  const res = await fetch(
-    `https://api.bitbucket.org/2.0/repositories/${workspace}/${repo}`,
-    { headers: headers() }
-  );
-  if (res.status === 404) throw new Error("Bitbucket repository not found.");
-  if (res.status === 401 || res.status === 403) {
-    throw new Error("Private Bitbucket repo — set BITBUCKET_TOKEN.");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  
+  try {
+    const res = await fetch(
+      `https://api.bitbucket.org/2.0/repositories/${workspace}/${repo}`,
+      { 
+        headers: headers(),
+        signal: controller.signal
+      }
+    );
+    clearTimeout(timeoutId);
+    
+    if (res.status === 404) throw new Error("Bitbucket repository not found.");
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Private Bitbucket repo — set BITBUCKET_TOKEN.");
+    }
+    if (!res.ok) throw new Error(`Bitbucket API error (${res.status})`);
+    const data = (await res.json()) as { mainbranch?: { name?: string } };
+    return data.mainbranch?.name ?? "main";
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Bitbucket API request timed out after 10 seconds');
+    }
+    throw error;
   }
-  if (!res.ok) throw new Error(`Bitbucket API error (${res.status})`);
-  const data = (await res.json()) as { mainbranch?: { name?: string } };
-  return data.mainbranch?.name ?? "main";
 }
 
 export async function collectFromBitbucket(

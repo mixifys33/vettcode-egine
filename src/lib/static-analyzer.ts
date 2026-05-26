@@ -811,6 +811,11 @@ function runPatternsWithGraph(
 
         // Get evidence (the matched line)
         const evidence = lines[lineNumber - 1]?.trim() || match[0];
+        
+        // Skip if this is a pattern definition itself (meta-detection)
+        if (isPatternDefinition(evidence, file.path)) {
+          continue;
+        }
 
         // Get surrounding context for smart validation
         // For file upload checks, we need broader context to find size validations
@@ -913,6 +918,32 @@ function deduplicateFindings(findings: StaticFinding[]): StaticFinding[] {
  * 3. UI wiring detection - identifies components that delegate to others
  * 4. Security constant tracking - finds size limits in dependency chain
  */
+/**
+ * Detect if a line is a pattern definition itself (meta-detection)
+ * Prevents the scanner from flagging its own pattern definitions
+ */
+function isPatternDefinition(evidence: string, filePath: string): boolean {
+  // Check if this is in a pattern definition file
+  const isPatternFile = /pattern|analyzer|enhanced-pattern/i.test(filePath);
+  
+  if (!isPatternFile) return false;
+  
+  // Check if line contains pattern definition keywords
+  const patternKeywords = [
+    /^\s*id:\s*['"]/, // id: "pattern-name"
+    /^\s*regex:\s*\//, // regex: /pattern/
+    /^\s*title:\s*['"]/, // title: "Pattern Title"
+    /^\s*description:\s*['"]/, // description: "..."
+    /^\s*severity:\s*['"]/, // severity: "high"
+    /^\s*category:\s*['"]/, // category: "security"
+    /^\s*confidence:\s*['"]/, // confidence: "high"
+    /const\s+\w+_PATTERNS:\s*Pattern\[\]/, // Pattern array definition
+    /const skipPatterns = \[/, // skipPatterns array
+  ];
+  
+  return patternKeywords.some(keyword => keyword.test(evidence));
+}
+
 function isFalsePositive(
   patternId: string,
   evidence: string,

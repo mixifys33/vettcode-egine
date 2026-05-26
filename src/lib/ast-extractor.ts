@@ -386,6 +386,10 @@ export function extractHighRiskCode(
     };
   } catch (error) {
     // If AST parsing fails, fall back to pattern matching
+    // Log error for debugging but continue with fallback
+    if (error instanceof Error) {
+      console.error(`[AST Extraction] Failed to parse ${filepath}: ${error.message}`);
+    }
     return extractWithPatterns(filepath, content, language);
   }
 }
