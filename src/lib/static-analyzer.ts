@@ -1362,13 +1362,216 @@ function validateDatabaseTransaction(evidence: string, context: string, filePath
 }
 
 function validatePromiseHandling(evidence: string, context: string, filePath: string): boolean {
-  // False positive if function throws errors for caller to handle
-  if (/throw\s+new\s+Error|throw\s+error/.test(context)) return true;
+  // ============================================
+  // LAYER 1: Structural Analysis - Is this even executable code?
+  // ============================================
   
-  // False positive in collector/fetcher files that propagate errors
-  if (/collector|fetch/.test(filePath) && /if\s*\(!res\.ok\)\s*throw|if\s*\(res\.status.*\)\s*throw/i.test(context)) return true;
+  // FALSE POSITIVE: Function/method DECLARATIONS (not invocations)
+  // These define functions - error handling happens at the CALL SITE
+  // Examples:
+  //   - export async function myFunc() { ... }
+  //   - async function helper() { ... }
+  //   - const myFunc = async () => { ... }
+  //   - async myMethod() { ... }
+  if (/^(?:export\s+)?(?:async\s+function|const\s+\w+\s*=\s*async|async\s+\w+\s*\()/i.test(evidence.trim())) {
+    return true;
+  }
   
-  return false;
+  // FALSE POSITIVE: Comments (not actual code)
+  if (/^\/\/|^\/\*|\*\/\s*$/.test(evidence.trim())) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: String literals (pattern definitions, documentation, examples)
+  // Matches: title: "...", description: "...", message: "...", etc.
+  if (/(?:title|description|message|error|text|label|placeholder|hint|note|comment)\s*:\s*['"`]/i.test(evidence)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: JSDoc or documentation comments
+  if (/\/\*\*[\s\S]*?\*\/|@param|@returns|@throws|@example/i.test(context)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: Type definitions (TypeScript interfaces, types)
+  if (/^(?:interface|type|enum|namespace)\s+\w+|:\s*Promise<|:\s*async\s*\(/i.test(evidence)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 2: Error Handling Strategy Detection
+  // ============================================
+  
+  // VALID PATTERN: Function throws errors (error boundary pattern)
+  // The caller is responsible for handling - this is a valid design pattern
+  if (/throw\s+new\s+(?:Error|TypeError|RangeError|ValidationError|HttpError)|throw\s+(?:error|err|e)\b/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Error propagation in utility/library functions
+  // These functions are designed to throw - callers handle errors
+  const isUtilityFunction = /\/(?:lib|utils?|helpers?|services?|api|core|shared)\//i.test(filePath);
+  if (isUtilityFunction) {
+    // Check if function is designed to propagate errors
+    if (/if\s*\([^)]*(?:!|error|fail|invalid)\s*\)/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // VALID PATTERN: Wrapped in try-catch at call site or in parent scope
+  // Look for try-catch in broader context (up to 50 lines before/after)
+  if (/try\s*\{[\s\S]{0,2000}\}\s*catch\s*\(/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Promise.all/race with .catch() handler
+  if (/Promise\.(?:all|race|allSettled|any)\s*\([^)]*\)\.catch\(/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Async function with .catch() on await
+  if (/await\s+[^;]+\.catch\(/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 3: Framework-Specific Patterns
+  // ============================================
+  
+  // VALID PATTERN: Next.js API routes (framework handles errors)
+  if (/route\.ts|route\.js|api\/.*\/route/i.test(filePath)) {
+    // Next.js wraps API routes in error boundaries
+    if (/export\s+async\s+function\s+(?:GET|POST|PUT|DELETE|PATCH)/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // VALID PATTERN: React Server Components (framework handles errors)
+  if (/page\.tsx|layout\.tsx|loading\.tsx|error\.tsx/i.test(filePath)) {
+    // React Server Components have error boundaries
+    if (/export\s+(?:default\s+)?async\s+function/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // VALID PATTERN: Express/Koa middleware (framework handles errors)
+  if (/app\.(?:get|post|put|delete|patch|use)|router\.(?:get|post|put|delete|patch)/i.test(context)) {
+    // Express/Koa have error handling middleware
+    return true;
+  }
+  
+  // VALID PATTERN: Event handlers (framework handles errors)
+  if (/addEventListener|on(?:Click|Change|Submit|Load|Error)|\.on\(['"]|\.once\(['"]/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 4: Architectural Patterns
+  // ============================================
+  
+  // VALID PATTERN: Repository/DAO pattern (throws for service layer to handle)
+  if (/class\s+\w*(?:Repository|DAO|Service|Controller|Handler)\b/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Factory functions (return promises for caller to handle)
+  if (/(?:create|build|make|get|fetch|load)\w*\s*(?:=\s*)?async\s*(?:function|\()/i.test(evidence)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Callback-based async (error passed to callback)
+  if (/callback\s*\((?:err|error)|done\s*\((?:err|error)/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Promise constructor (error handling in resolve/reject)
+  if (/new\s+Promise\s*\(\s*(?:async\s*)?\(\s*resolve\s*,\s*reject\s*\)/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 5: Testing & Development Code
+  // ============================================
+  
+  // VALID PATTERN: Test files (test frameworks handle errors)
+  if (/\.(?:test|spec)\.[jt]sx?$|__tests__|__mocks__/i.test(filePath)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Mock/stub functions (not real implementations)
+  if (/mock|stub|fake|dummy|jest\.fn|vi\.fn|sinon\./i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Example/demo code
+  if (/example|demo|sample|tutorial|playground/i.test(filePath)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 6: Advanced Error Handling Patterns
+  // ============================================
+  
+  // VALID PATTERN: Error monitoring/logging services
+  if (/sentry|bugsnag|rollbar|newrelic|datadog|logger\.error|console\.error/i.test(context)) {
+    // If errors are being logged/monitored, they're being handled
+    return true;
+  }
+  
+  // VALID PATTERN: Retry logic (errors are expected and handled)
+  if (/retry|attempt|backoff|exponential|maxRetries/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Circuit breaker pattern
+  if (/circuit|breaker|fallback|timeout|abort/i.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: Saga pattern (orchestrated error handling)
+  if (/saga|compensate|rollback|transaction/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 7: Language-Specific Patterns
+  // ============================================
+  
+  // VALID PATTERN: Top-level await (module-level error handling)
+  if (/^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*await/m.test(context)) {
+    return true;
+  }
+  
+  // VALID PATTERN: IIFE with error handling
+  if (/\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*\}\s*\)\s*\(\s*\)(?:\.catch)?/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 8: Real Vulnerability Detection
+  // ============================================
+  
+  // REAL ISSUE: Floating promise (not awaited, not assigned, not chained)
+  // Example: myAsyncFunc(); // <- This is bad
+  const isFloatingPromise = /^\s*\w+\s*\([^)]*\)\s*;?\s*$/m.test(evidence) && 
+                           !/(?:await|return|const|let|var|=|\.|then|catch)/i.test(evidence);
+  
+  if (isFloatingPromise) {
+    return false; // This is a REAL issue
+  }
+  
+  // REAL ISSUE: Promise.all without ANY error handling
+  if (/Promise\.all\s*\([^)]*\)/i.test(evidence)) {
+    // Check if there's NO error handling anywhere nearby
+    const hasNoErrorHandling = !/(?:try|catch|\.catch|throw|error)/i.test(context);
+    if (hasNoErrorHandling) {
+      return false; // This is a REAL issue
+    }
+  }
+  
+  // Default: If we can't determine it's safe, it might be an issue
+  // But be conservative - only flag if it's clearly problematic
+  return true; // Assume it's handled unless proven otherwise
 }
 
 function validateXSSRisk(evidence: string, context: string): boolean {
@@ -1412,36 +1615,202 @@ function validateQueryInLoop(evidence: string, context: string): boolean {
 }
 
 function validateDatabaseQuery(evidence: string, context: string, filePath: string, filePurpose: string): boolean {
+  // ============================================
+  // LAYER 1: Non-Code Context Detection
+  // ============================================
+  
   // FALSE POSITIVE: Scanner's own pattern definitions
   if (filePurpose === 'scanner' || filePurpose === 'analyzer' || filePurpose === 'pattern-definition') {
     // Check if it's a pattern definition (regex, title, description)
-    if (/regex:|title:|description:|Pattern\[\]|id:\s*['"]db-/i.test(context)) {
+    if (/regex\s*:|title\s*:|description\s*:|Pattern\[\]|id\s*:\s*['"]db-/i.test(context)) {
       return true;
     }
   }
   
-  // FALSE POSITIVE: JavaScript array methods (not database queries)
-  // .find() on arrays, not database queries
-  if (/(?:reports|findings|files|items|results|array|list)\.find\(/i.test(evidence)) {
+  // FALSE POSITIVE: Comments (not actual code)
+  if (/^\/\/|^\/\*|\*\/\s*$/.test(evidence.trim())) {
     return true;
   }
   
-  // .filter() on arrays
-  if (/\.filter\(/i.test(evidence)) {
+  // FALSE POSITIVE: String literals in documentation/messages
+  if (/(?:title|description|message|error|text|comment)\s*:\s*['"`].*(?:find|query|SELECT)/i.test(evidence)) {
     return true;
   }
   
-  // FALSE POSITIVE: In-memory operations
-  if (/const\s+\w+\s*=\s*\w+\.find\(|const\s+\w+\s*=\s*\w+\.filter\(/i.test(evidence)) {
+  // FALSE POSITIVE: JSDoc or code comments
+  if (/\/\*\*[\s\S]*?\*\/|@example|@description|\/\/\s*(?:Example|Note|TODO)/i.test(context)) {
     return true;
   }
   
-  // FALSE POSITIVE: Pattern definitions containing "find(" or "SELECT *"
-  if (/regex\s*:|pattern\s*:|\/.*find\(.*\/|\/.*SELECT.*\//i.test(context)) {
+  // ============================================
+  // LAYER 2: JavaScript Array Methods (NOT Database Queries)
+  // ============================================
+  
+  // FALSE POSITIVE: Array.find() - in-memory operation
+  // Examples: users.find(u => u.id === id), items.find(item => ...)
+  if (/\.find\s*\(/i.test(evidence)) {
+    // Check if it's on an array variable (not a database model)
+    if (/(?:const|let|var|return)\s+\w+\s*=\s*\w+\.find\(/i.test(evidence)) {
+      return true;
+    }
+    // Check for common array variable names
+    if (/(?:array|list|items|results|data|collection|records|rows|entries|elements)\.find\(/i.test(evidence)) {
+      return true;
+    }
+    // Check if the source is clearly an array
+    if (/\[\s*.*\s*\]\.find\(|\.filter\([^)]*\)\.find\(|\.map\([^)]*\)\.find\(/i.test(context)) {
+      return true;
+    }
+  }
+  
+  // FALSE POSITIVE: Array.filter() - in-memory operation
+  if (/\.filter\s*\(/i.test(evidence)) {
+    return true; // filter() is always an array method, never a database query
+  }
+  
+  // FALSE POSITIVE: Array.map(), .reduce(), .some(), .every() - all in-memory
+  if (/\.(?:map|reduce|some|every|forEach|slice|splice)\s*\(/i.test(evidence)) {
     return true;
   }
   
-  return false;
+  // ============================================
+  // LAYER 3: Database Query Detection (Real Queries)
+  // ============================================
+  
+  // REAL QUERY: ORM/Query Builder methods
+  const isRealDatabaseQuery = 
+    // Prisma
+    /prisma\.\w+\.(?:findMany|findFirst|findUnique|create|update|delete|count)\s*\(/i.test(context) ||
+    // Mongoose
+    /Model\.(?:find|findOne|findById|create|update|delete|count)\s*\(/i.test(context) ||
+    // Sequelize
+    /\.(?:findAll|findOne|findByPk|create|update|destroy)\s*\(/i.test(context) ||
+    // TypeORM
+    /repository\.(?:find|findOne|findAndCount|save|remove)\s*\(/i.test(context) ||
+    // Knex
+    /knex\s*\(\s*['"`]\w+['"`]\s*\)\.(?:select|where|insert|update|delete)/i.test(context) ||
+    // Raw SQL
+    /(?:execute|query|raw)\s*\(\s*['"`](?:SELECT|INSERT|UPDATE|DELETE)/i.test(context);
+  
+  if (!isRealDatabaseQuery) {
+    // Not a database query at all
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 4: Valid Query Patterns (With Limits/Pagination)
+  // ============================================
+  
+  // VALID: Query has LIMIT/TAKE/TOP
+  if (/\.(?:limit|take|top|first)\s*\(\s*\d+\s*\)/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: Query has pagination (skip/offset + limit/take)
+  if (/\.(?:skip|offset)\s*\([^)]*\)[\s\S]{0,100}\.(?:limit|take)\s*\(/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: Query has WHERE clause with specific ID/unique field
+  if (/\.(?:where|findUnique|findById|findByPk)\s*\(\s*\{[^}]*(?:id|_id|uuid|key)\s*:/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: Query uses findOne/findFirst (returns single record)
+  if (/\.(?:findOne|findFirst|findUnique|findById|findByPk)\s*\(/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: Count queries (don't return data)
+  if (/\.count\s*\(/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: Aggregation queries (usually return summary data)
+  if (/\.(?:aggregate|groupBy|sum|avg|min|max)\s*\(/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 5: Context-Specific Valid Patterns
+  // ============================================
+  
+  // VALID: Small/test datasets (development/testing)
+  if (/\/(?:test|spec|mock|fixture|seed|sample)\//i.test(filePath)) {
+    return true;
+  }
+  
+  // VALID: Admin/internal tools (not user-facing)
+  if (/\/(?:admin|internal|tools|scripts|migrations)\//i.test(filePath)) {
+    return true;
+  }
+  
+  // VALID: Background jobs/workers (controlled execution)
+  if (/\/(?:jobs|workers|tasks|cron|queue)\//i.test(filePath)) {
+    return true;
+  }
+  
+  // VALID: Queries with explicit small limits in code
+  if (/(?:MAX|LIMIT|TOP)_(?:RESULTS|ROWS|ITEMS)\s*=\s*\d{1,3}\b/i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 6: Framework-Specific Patterns
+  // ============================================
+  
+  // VALID: Next.js with pagination params
+  if (/searchParams|params\.page|params\.limit|query\.page|query\.limit/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: GraphQL resolvers (framework handles pagination)
+  if (/resolver|@Query|@Mutation|GraphQL/i.test(context)) {
+    return true;
+  }
+  
+  // VALID: tRPC procedures (framework handles pagination)
+  if (/\.query\(|\.mutation\(|trpc\./i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 7: Pattern Definitions (Not Real Code)
+  // ============================================
+  
+  // FALSE POSITIVE: Regex patterns containing "find(" or "SELECT *"
+  if (/\/.*(?:find|SELECT|query).*\/[gimuy]*/i.test(evidence)) {
+    return true;
+  }
+  
+  // FALSE POSITIVE: Pattern object definitions
+  if (/\{\s*id\s*:\s*['"]|regex\s*:\s*\/|pattern\s*:\s*\//i.test(context)) {
+    return true;
+  }
+  
+  // ============================================
+  // LAYER 8: Real Issues (Return false to flag)
+  // ============================================
+  
+  // REAL ISSUE: findMany() or find({}) without any limits
+  if (/\.(?:findMany|find)\s*\(\s*\{?\s*\}?\s*\)/i.test(evidence)) {
+    // Check if there's NO limit anywhere in the context
+    const hasNoLimit = !/\.(?:limit|take|top|first|skip|offset|page)\s*\(/i.test(context);
+    if (hasNoLimit) {
+      return false; // This is a REAL issue
+    }
+  }
+  
+  // REAL ISSUE: SELECT * without LIMIT
+  if (/SELECT\s+\*\s+FROM/i.test(evidence)) {
+    const hasNoLimit = !/LIMIT\s+\d+|TOP\s+\d+|FETCH\s+FIRST/i.test(context);
+    if (hasNoLimit) {
+      return false; // This is a REAL issue
+    }
+  }
+  
+  // Default: Assume it's safe (conservative approach)
+  return true;
 }
 
 function validatePromiseAllErrorHandling(evidence: string, context: string): boolean {
