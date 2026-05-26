@@ -400,15 +400,16 @@ export const DATABASE_PATTERNS: Pattern[] = [
 // ERROR HANDLING - 20 Patterns
 // ============================================
 export const ERROR_HANDLING_PATTERNS: Pattern[] = [
-  {
-    id: "unhandled-promise-rejection",
-    regex: /(?:async\s+function|\.then\s*\(|Promise\.)(?![\s\S]{0,200}\.catch)/gi,
-    severity: "high",
-    category: "production",
-    title: "Unhandled Promise Rejection",
-    description: "Async operation without error handling",
-    confidence: "low",
-  },
+  // DISABLED: Fundamentally flawed - flags function declarations instead of actual unhandled promises
+  // {
+  //   id: "unhandled-promise-rejection",
+  //   regex: /(?:async\s+function|\.then\s*\(|Promise\.)(?![\s\S]{0,200}\.catch)/gi,
+  //   severity: "high",
+  //   category: "production",
+  //   title: "Unhandled Promise Rejection",
+  //   description: "Async operation without error handling",
+  //   confidence: "low",
+  // },
   {
     id: "empty-catch-block",
     regex: /catch\s*\([^)]*\)\s*\{\s*\}/gi,
