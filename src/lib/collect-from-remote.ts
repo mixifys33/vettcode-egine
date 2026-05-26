@@ -30,8 +30,12 @@ export async function collectFromRemoteUrl(
     };
   } catch (error) {
     clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Repository fetch timed out after 30 seconds');
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Repository fetch timed out after 30 seconds');
+      }
+      // Log error for debugging
+      console.error(`[Remote Collector] Error fetching repository: ${error.message}`);
     }
     throw error;
   }

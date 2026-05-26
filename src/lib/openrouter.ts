@@ -23,8 +23,11 @@ export function getApiKeys(): string[] {
     console.error('[OpenRouter] No API keys found! Check environment variables.');
     console.error('[OpenRouter] OPENROUTER_API_KEYS:', process.env.OPENROUTER_API_KEYS ? 'SET' : 'NOT SET');
     console.error('[OpenRouter] OPENROUTER_API_KEY_1:', process.env.OPENROUTER_API_KEY_1 ? 'SET' : 'NOT SET');
-  } else if (process.env.NODE_ENV === 'development') {
-    console.log(`[OpenRouter] Found ${keys.length} API key(s)`);
+  } else {
+    const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
+    if (nodeEnv === 'development') {
+      console.log(`[OpenRouter] Found ${keys.length} API key(s)`);
+    }
   }
   
   return [...new Set(keys)];
@@ -78,10 +81,11 @@ export async function chatCompletion(
 ): Promise<ChatResult> {
   const apiKey = keyOverride ?? nextApiKey();
   const models = getModels();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+  
+  // Validate and construct site URL
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  const publicUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const siteUrl = publicUrl || (vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000");
 
   const body: Record<string, unknown> = {
     models,
@@ -97,11 +101,15 @@ export async function chatCompletion(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (process.env.NODE_ENV === 'development') {
+      const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
+      if (nodeEnv === 'development') {
         console.log(`[OpenRouter] Attempt ${attempt + 1}/${retries + 1} - Calling ${OPENROUTER_URL}`);
         console.log(`[OpenRouter] Models: ${JSON.stringify(models)}`);
         console.log(`[OpenRouter] Message count: ${messages.length}, Total chars: ${messages.reduce((sum, m) => sum + m.content.length, 0)}`);
       }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
       
       const res = await fetch(OPENROUTER_URL, {
         method: "POST",
@@ -112,9 +120,12 @@ export async function chatCompletion(
           "X-Title": "Vettcode Engine",
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (nodeEnv === 'development') {
         console.log(`[OpenRouter] Response status: ${res.status}`);
       }
 
@@ -141,7 +152,8 @@ export async function chatCompletion(
 
       const content = data.choices?.[0]?.message?.content?.trim();
       
-      if (process.env.NODE_ENV === 'development') {
+      const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
+      if (nodeEnv === 'development') {
         console.log(`[OpenRouter] Response model: ${data.model || 'unknown'}`);
         console.log(`[OpenRouter] Content length: ${content?.length || 0} chars`);
       }
@@ -155,11 +167,16 @@ export async function chatCompletion(
         throw new Error("Empty response from OpenRouter after retries");
       }
 
-      if (process.env.NODE_ENV === 'development') {
+      if (nodeEnv === 'development') {
         console.log(`[OpenRouter] ✓ Success on attempt ${attempt + 1}`);
       }
       return { content, model: data.model ?? models[0] };
     } catch (error) {
+      // Log error for debugging
+      if (error instanceof Error) {
+        console.error(`[OpenRouter] Request error: ${error.message}`);
+      }
+      
       if (attempt === retries) {
         console.error(`[OpenRouter] ✗ All attempts failed:`, error);
         throw error;
@@ -190,6 +207,11 @@ export function parseJsonFromModel<T>(raw: string): T {
   try {
     return JSON.parse(jsonStr) as T;
   } catch (error) {
+    // Log initial parse error
+    if (error instanceof Error) {
+      console.error(`[JSON Parse] Initial parse failed: ${error.message}`);
+    }
+    
     // Try to fix common JSON issues
     try {
       // Fix unescaped quotes in strings
@@ -198,8 +220,9 @@ export function parseJsonFromModel<T>(raw: string): T {
         .replace(/: "([^"]*)"([^,}\]])/g, ': "$1\\"$2'); // Fix values
       
       return JSON.parse(fixed) as T;
-    } catch {
-      console.error('Failed to parse JSON:', jsonStr.substring(0, 500));
+    } catch (fixError) {
+      console.error('[JSON Parse] Failed to parse JSON:', jsonStr.substring(0, 500));
+      console.error('[JSON Parse] Fix attempt also failed:', fixError);
       throw new Error(`Invalid JSON response from AI: ${error instanceof Error ? error.message : 'Parse error'}`);
     }
   }

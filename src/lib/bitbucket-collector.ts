@@ -36,8 +36,12 @@ async function defaultBranch(workspace: string, repo: string): Promise<string> {
     return data.mainbranch?.name ?? "main";
   } catch (error) {
     clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Bitbucket API request timed out after 10 seconds');
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Bitbucket API request timed out after 10 seconds');
+      }
+      // Log error for debugging
+      console.error(`[Bitbucket Collector] Error fetching default branch: ${error.message}`);
     }
     throw error;
   }

@@ -60,8 +60,13 @@ export async function downloadAndCollectZip(
   } catch (error) {
     clearTimeout(timeoutId);
     
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Download timeout: ${provider} repository took too long to download. Try a smaller repository.`);
+    // Log error for debugging
+    if (error instanceof Error) {
+      console.error(`[Remote Repo Fetch] Error downloading from ${provider}: ${error.message}`);
+      
+      if (error.name === 'AbortError') {
+        throw new Error(`Download timeout: ${provider} repository took too long to download. Try a smaller repository.`);
+      }
     }
     
     throw error;

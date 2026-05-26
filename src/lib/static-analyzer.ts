@@ -1021,6 +1021,9 @@ function isFalsePositive(
   // ============================================
   
   switch (patternId) {
+    case "ai-mock-data":
+      return validateMockData(evidence, context, filePath);
+      
     case "eval-usage":
       return validateEvalUsage(evidence, context);
       
@@ -1055,6 +1058,17 @@ function isFalsePositive(
       
     case "missing-timeout":
       return validateTimeout(evidence, context);
+      
+    case "memory-leak-timer":
+    case "memory-leak-listener":
+      return validateMemoryLeak(evidence, context);
+      
+    case "env-var-no-validation":
+      return validateEnvVariable(evidence, context);
+      
+    case "catch-no-logging":
+    case "error-not-logged":
+      return validateErrorLogging(evidence, context);
       
     case "missing-rate-limit":
       return validateRateLimit(evidence, context);
@@ -1139,6 +1153,39 @@ function identifyFilePurpose(filePath: string, context: string): 'scanner' | 'an
 // ============================================
 // HELPER FUNCTIONS: Semantic Validators
 // ============================================
+
+function validateMockData(evidence: string, context: string, filePath: string): boolean {
+  // False positive if this is a legitimate configuration array
+  const legitimateArrays = [
+    /skipPatterns/i,
+    /ignorePatterns/i,
+    /excludePatterns/i,
+    /allowedExtensions/i,
+    /supportedLanguages/i,
+    /filePatterns/i,
+  ];
+  
+  if (legitimateArrays.some(pattern => pattern.test(evidence))) {
+    return true;
+  }
+  
+  // False positive if it's a regex pattern array (contains regex literals)
+  if (/\/.*\/[gimuy]/.test(context)) {
+    return true;
+  }
+  
+  // False positive if in test files (test data is expected)
+  if (/\.(test|spec)\.[jt]sx?$/.test(filePath)) {
+    return true;
+  }
+  
+  // False positive if it's a type definition or interface
+  if (/interface|type\s+\w+\s*=|enum/.test(context)) {
+    return true;
+  }
+  
+  return false;
+}
 
 function validateEvalUsage(evidence: string, context: string): boolean {
   // False positive if eval is in a string/pattern
@@ -1606,6 +1653,42 @@ function validateConsoleLog(evidence: string, context: string, filePath: string,
 
 function validateTimeout(evidence: string, context: string): boolean {
   return /timeout|AbortController|signal|controller\.abort/i.test(context);
+}
+
+function validateMemoryLeak(evidence: string, context: string): boolean {
+  // False positive if timer/listener is cleaned up
+  const hasCleanup = /clearTimeout|clearInterval|removeEventListener|cleanup|abort|cancel/i.test(context);
+  
+  // False positive if in a try-finally or try-catch with cleanup
+  const hasTryFinally = /try\s*\{[\s\S]*\}\s*finally\s*\{[\s\S]*clear/i.test(context);
+  
+  return hasCleanup || hasTryFinally;
+}
+
+function validateEnvVariable(evidence: string, context: string): boolean {
+  // False positive if env var is validated with trim(), default value, or conditional
+  const hasValidation = /\?\.trim\(\)|\|\||??|process\.env\.\w+\s*\?/i.test(evidence);
+  
+  // False positive if checking NODE_ENV (standard practice)
+  const isNodeEnv = /NODE_ENV/.test(evidence);
+  
+  // False positive if there's a fallback or default value
+  const hasDefault = /\|\|\s*['"]|??\s*['"]/.test(context);
+  
+  return hasValidation || (isNodeEnv && hasDefault);
+}
+
+function validateErrorLogging(evidence: string, context: string): boolean {
+  // False positive if error is logged
+  const hasLogging = /console\.(error|warn|log)|logger\.|log\(|error\(/i.test(context);
+  
+  // False positive if error is re-thrown (propagated up)
+  const isRethrown = /throw\s+error|throw\s+e|throw\s+err/i.test(context);
+  
+  // False positive if error is returned
+  const isReturned = /return\s+error|return\s+\{[\s\S]*error/i.test(context);
+  
+  return hasLogging || isRethrown || isReturned;
 }
 
 function validateRateLimit(evidence: string, context: string): boolean {

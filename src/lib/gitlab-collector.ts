@@ -14,17 +14,35 @@ function headers(): Record<string, string> {
 }
 
 async function defaultBranch(parsed: ParsedGitLabRepo): Promise<string> {
-  const encoded = encodeURIComponent(parsed.path);
-  const res = await fetch(`${apiBase(parsed.host)}/projects/${encoded}`, {
-    headers: headers(),
-  });
-  if (res.status === 404) throw new Error("GitLab project not found.");
-  if (res.status === 401 || res.status === 403) {
-    throw new Error("Private GitLab project — set GITLAB_TOKEN.");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  
+  try {
+    const encoded = encodeURIComponent(parsed.path);
+    const res = await fetch(`${apiBase(parsed.host)}/projects/${encoded}`, {
+      headers: headers(),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    
+    if (res.status === 404) throw new Error("GitLab project not found.");
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Private GitLab project — set GITLAB_TOKEN.");
+    }
+    if (!res.ok) throw new Error(`GitLab API error (${res.status})`);
+    const data = (await res.json()) as { default_branch?: string };
+    return data.default_branch ?? "main";
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('GitLab API request timed out after 10 seconds');
+      }
+      // Log error for debugging
+      console.error(`[GitLab Collector] Error fetching default branch: ${error.message}`);
+    }
+    throw error;
   }
-  if (!res.ok) throw new Error(`GitLab API error (${res.status})`);
-  const data = (await res.json()) as { default_branch?: string };
-  return data.default_branch ?? "main";
 }
 
 export async function collectFromGitLab(
