@@ -1040,9 +1040,6 @@ function isFalsePositive(
     case "api-no-input-validation":
       return validateInputValidation(evidence, context);
       
-    case "missing-auth-check":
-      return validateAuthCheck(evidence, context);
-      
     case "db-query-in-loop":
       return validateQueryInLoop(evidence, context);
       
@@ -1407,16 +1404,6 @@ function validateRateLimit(evidence: string, context: string): boolean {
 
 function validateInputValidation(evidence: string, context: string): boolean {
   return /validate|schema|zod|joi|yup|check|sanitize/i.test(context);
-}
-
-function validateAuthCheck(evidence: string, context: string): boolean {
-  // Has auth middleware
-  if (/middleware|auth|protect|guard|verify|check.*auth/i.test(context)) return true;
-  
-  // Public endpoint
-  if (/router\.get.*public|app\.get.*public|\/api\/public/i.test(context)) return true;
-  
-  return false;
 }
 
 function validateQueryInLoop(evidence: string, context: string): boolean {
