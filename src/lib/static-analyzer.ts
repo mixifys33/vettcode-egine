@@ -193,15 +193,16 @@ const SECURITY_PATTERNS: Pattern[] = [
   },
 
   // Production Issues
-  {
-    id: "unhandled-promise",
-    regex: /(?:async\s+function|async\s*\(|Promise\.(?:all|race))\s*[^{]*\{[^}]*(?:await\s+[^;]+;?)(?![^}]*\.catch\(|[^}]*try\s*\{)/gi,
-    severity: "medium",
-    category: "production",
-    title: "Unhandled Promise Rejection",
-    description: "Async operation without error handling can crash the application",
-    confidence: "low",
-  },
+  // DISABLED: This pattern is fundamentally flawed - it flags function declarations instead of actual unhandled promises
+  // {
+  //   id: "unhandled-promise",
+  //   regex: /(?:async\s+function|async\s*\(|Promise\.(?:all|race))\s*[^{]*\{[^}]*(?:await\s+[^;]+;?)(?![^}]*\.catch\(|[^}]*try\s*\{)/gi,
+  //   severity: "medium",
+  //   category: "production",
+  //   title: "Unhandled Promise Rejection",
+  //   description: "Async operation without error handling can crash the application",
+  //   confidence: "low",
+  // },
   {
     id: "console-log-production",
     regex: /console\.(?:log|debug|info)\(/gi,
