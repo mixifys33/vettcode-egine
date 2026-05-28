@@ -364,6 +364,7 @@ export default function Home() {
 
       {showAuthModal && (
         <AuthModal
+          isOpen={showAuthModal}
           onClose={() => setShowAuthModal(false)}
           onSuccess={() => {
             setShowAuthModal(false);
