@@ -503,33 +503,82 @@ async function analyzeBatchWithAI(
 function calculateStrictScore(findings: VerifiedFinding[]): number {
   if (findings.length === 0) return 95; // Not perfect, might have missed issues
 
-  let deductions = 0;
-
+  // Weighted category-based scoring system
+  // Each severity has its own "bucket" that can be depleted independently
+  // This prevents info/low errors from tanking the entire score
+  
+  const CATEGORY_WEIGHTS = {
+    critical: 35,  // 35% of total score
+    high: 25,      // 25% of total score (Critical + High = 60%)
+    medium: 25,    // 25% of total score
+    low: 10,       // 10% of total score
+    info: 5,       // 5% of total score
+  };
+  
+  // Count findings by severity
+  const counts = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+  };
+  
   for (const finding of findings) {
-    let weight = 1;
-
-    // Severity weight
-    switch (finding.severity) {
-      case "critical": weight = 15; break;
-      case "high": weight = 8; break;
-      case "medium": weight = 4; break;
-      case "low": weight = 2; break;
-      case "info": weight = 0.5; break;
-    }
-
-    // Confidence multiplier
+    // Apply confidence multiplier to count
+    let weight = 1.0;
     switch (finding.confidence) {
-      case "high": weight *= 1.0; break;
-      case "medium": weight *= 0.7; break;
-      case "low": weight *= 0.4; break;
+      case "high": weight = 1.0; break;
+      case "medium": weight = 0.7; break;
+      case "low": weight = 0.4; break;
     }
-
-    deductions += weight;
+    
+    counts[finding.severity] += weight;
   }
+  
+  // Calculate score for each category
+  // Each category depletes independently based on issue count
+  const categoryScores = {
+    critical: calculateCategoryScore(counts.critical, CATEGORY_WEIGHTS.critical, 0.5), // 0.5 = aggressive penalty
+    high: calculateCategoryScore(counts.high, CATEGORY_WEIGHTS.high, 0.4),
+    medium: calculateCategoryScore(counts.medium, CATEGORY_WEIGHTS.medium, 0.3),
+    low: calculateCategoryScore(counts.low, CATEGORY_WEIGHTS.low, 0.2),
+    info: calculateCategoryScore(counts.info, CATEGORY_WEIGHTS.info, 0.1), // 0.1 = gentle penalty
+  };
+  
+  // Sum up all category scores
+  const totalScore = Math.round(
+    categoryScores.critical +
+    categoryScores.high +
+    categoryScores.medium +
+    categoryScores.low +
+    categoryScores.info
+  );
+  
+  return Math.max(0, Math.min(100, totalScore));
+}
 
-  // Strict scoring: start at 100, deduct heavily
-  const score = Math.max(0, Math.round(100 - deductions));
-  return score;
+/**
+ * Calculate score for a single category using logarithmic decay
+ * This prevents a single category from being completely destroyed by many issues
+ * 
+ * @param issueCount - Number of issues (weighted by confidence)
+ * @param maxPoints - Maximum points for this category
+ * @param decayRate - How fast the score decays (higher = faster decay)
+ */
+function calculateCategoryScore(issueCount: number, maxPoints: number, decayRate: number): number {
+  if (issueCount === 0) return maxPoints;
+  
+  // Logarithmic decay formula: score = maxPoints * e^(-decayRate * issueCount)
+  // This means:
+  // - First few issues hurt a lot
+  // - Additional issues hurt less and less
+  // - Score approaches 0 but never quite reaches it (unless many issues)
+  
+  const score = maxPoints * Math.exp(-decayRate * issueCount);
+  
+  // Round to 2 decimal places for precision
+  return Math.max(0, Math.round(score * 100) / 100);
 }
 
 function scoreToGrade(score: number): string {
