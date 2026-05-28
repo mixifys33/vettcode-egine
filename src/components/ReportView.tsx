@@ -5,6 +5,7 @@ import type { ScanMode } from "@/lib/smart-scan-orchestrator";
 import { useState, useEffect } from "react";
 import { PreListModal, type PreListFormData } from "./PreListModal";
 import { AutoPreListSettings } from "./AutoPreListSettings";
+import { AuthModal } from "./AuthModal";
 
 function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
   const [isOpen, setIsOpen] = useState(level < 2);
@@ -166,6 +167,7 @@ export function ReportView({
   const [showPreListModal, setShowPreListModal] = useState(false);
   const [showAutoPreListSettings, setShowAutoPreListSettings] = useState(false);
   const [autoPreListEnabled, setAutoPreListEnabled] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   // Check auto pre-list setting on mount
   useEffect(() => {
@@ -173,49 +175,17 @@ export function ReportView({
     setAutoPreListEnabled(saved === "true");
   }, []);
   
-  // Auto-open modal if setting is enabled and score >= 60
+  // Auto-open modal if setting is enabled and score >= 60 - DISABLED as per user request
+  // User does not want auto-open, only manual button click
   useEffect(() => {
-    if (autoPreListEnabled && report.score >= 60) {
-      // Check if user is authenticated with fresh token
-      const token = localStorage.getItem("sellerToken");
-      if (token) {
-        // Validate token freshness
-        try {
-          const tokenParts = token.split('_');
-          if (tokenParts.length >= 3) {
-            const timestamp = parseInt(tokenParts[2], 10);
-            const tokenAge = Date.now() - timestamp;
-            const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
-            
-            if (tokenAge <= MAX_TOKEN_AGE) {
-              // Token is fresh, open modal
-              const timer = setTimeout(() => {
-                setShowPreListModal(true);
-              }, 1000);
-              return () => clearTimeout(timer);
-            } else {
-              console.warn('[Auto Pre-List] Token expired, skipping auto-open');
-            }
-          }
-        } catch (error) {
-          console.error('[Auto Pre-List] Token validation error:', error);
-        }
-      }
-    }
-  }, [autoPreListEnabled, report.score]);
+    // Auto pre-list setting is saved but not auto-triggered
+    // Modal only opens on explicit button click
+  }, []);
   
-  // Check if user came back from login
+  // This useEffect is no longer needed since we use local AuthModal instead of redirects
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("openPreList") === "true") {
-      // Remove the parameter
-      window.history.replaceState({}, "", window.location.pathname);
-      // Open modal if user is authenticated
-      const token = localStorage.getItem("sellerToken");
-      if (token) {
-        setShowPreListModal(true);
-      }
-    }
+    // Previously handled redirect returns from external login
+    // Now handled by AuthModal internally
   }, []);
   
   const sorted = [...report.findings].sort((a, b) => {
@@ -311,19 +281,16 @@ export function ReportView({
   
   // Handle monetize button click - check auth and open modal
   const handleMonetizeClick = () => {
-    // Check if user is authenticated with fresh token
+    // Check if user has valid seller token
     const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
     
     if (!token) {
-      // Store current URL and redirect to login
-      const currentUrl = window.location.href;
-      const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
-      localStorage.setItem("vettcode_return_url", scannerUrl);
-      window.location.href = "https://vettcodedev.vercel.app/login";
+      // No token - show auth modal instead of redirecting
+      setShowAuthModal(true);
       return;
     }
     
-    // Validate token freshness (check if token is not expired)
+    // Validate token freshness
     try {
       const tokenParts = token.split('_');
       if (tokenParts.length >= 3) {
@@ -332,34 +299,33 @@ export function ReportView({
         const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
         
         if (tokenAge > MAX_TOKEN_AGE) {
-          // Token expired, redirect to login
-          console.warn('[Auth] Token expired, redirecting to login');
+          // Token expired - clear and show auth modal
+          console.warn('[Monetize] Token expired, showing login');
           localStorage.removeItem("sellerToken");
           localStorage.removeItem("vettcode_seller_token");
           localStorage.removeItem("seller_token");
-          
-          const currentUrl = window.location.href;
-          const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
-          localStorage.setItem("vettcode_return_url", scannerUrl);
-          window.location.href = "https://vettcodedev.vercel.app/login";
+          setShowAuthModal(true);
           return;
         }
       }
     } catch (error) {
-      console.error('[Auth] Token validation error:', error);
-      // If token format is invalid, treat as unauthenticated
+      console.error('[Monetize] Token validation error:', error);
+      // Invalid token format - show auth modal
       localStorage.removeItem("sellerToken");
       localStorage.removeItem("vettcode_seller_token");
       localStorage.removeItem("seller_token");
-      
-      const currentUrl = window.location.href;
-      const scannerUrl = currentUrl.split("?")[0] + "?openPreList=true";
-      localStorage.setItem("vettcode_return_url", scannerUrl);
-      window.location.href = "https://vettcodedev.vercel.app/login";
+      setShowAuthModal(true);
       return;
     }
 
-    // User is authenticated with fresh token, open modal
+    // User is authenticated with fresh token, open pre-list form directly
+    setShowPreListModal(true);
+  };
+  
+  // Handle successful authentication
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    // Open pre-list modal after successful login
     setShowPreListModal(true);
   };
 
@@ -1720,6 +1686,13 @@ export function ReportView({
         isOpen={showAutoPreListSettings}
         onClose={() => setShowAutoPreListSettings(false)}
         onSave={handleAutoPreListSave}
+      />
+
+      {/* Seller Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
       />
     </div>
   );

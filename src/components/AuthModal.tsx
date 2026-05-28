@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { setAuthUser, resetScanCount } from "@/lib/auth";
 
 interface AuthModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "register" | "verify">("login");
   const [loading, setLoading] = useState(false);
   const [googleAuthInProgress, setGoogleAuthInProgress] = useState(false);
@@ -414,7 +415,8 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
   return (
     <>
-      <div className="modal-overlay" onClick={handleOverlayClick}>
+      {isOpen && (
+        <div className="modal-overlay" onClick={handleOverlayClick}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
             <div>
@@ -653,6 +655,7 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         </p>
       </div>
     </div>
+      )}
     
     {/* Google Authentication Loading Overlay */}
     {googleAuthInProgress && (
