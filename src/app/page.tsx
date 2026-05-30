@@ -130,7 +130,8 @@ export default function Home() {
           setProgress(pct);
           setDetail(d);
         },
-        scanMode
+        scanMode,
+        result.allFilePaths
       );
 
       setReport(scanResult.report);
@@ -138,13 +139,13 @@ export default function Home() {
       // Save report for authenticated users
       if (isAuthenticated()) {
         try {
-          const saved = saveReport(projectName, scanResult.report, scanMode);
+          const saved = await saveReport(projectName, scanResult.report, scanMode);
           setCurrentReportId(saved.id);
         } catch (error) {
           console.error("Failed to save report:", error);
         }
       } else {
-        incrementScanCount();
+        await incrementScanCount();
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");

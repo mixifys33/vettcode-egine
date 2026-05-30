@@ -13,6 +13,9 @@ const AUTH_STORAGE_KEY = 'vettcode_auth';
 const SCAN_COUNT_KEY = 'vettcode_scan_count';
 const MAX_FREE_SCANS = 10;
 
+// Simple mutex for localStorage operations to prevent race conditions
+let scanCountMutex = Promise.resolve();
+
 // Get current authenticated user
 export function getAuthUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
@@ -52,12 +55,25 @@ export function getScanCount(): number {
   return count ? parseInt(count, 10) : 0;
 }
 
-// Increment scan count
-export function incrementScanCount(): void {
+// Increment scan count with mutex to prevent race conditions
+export async function incrementScanCount(): Promise<void> {
   if (typeof window === 'undefined') return;
   
-  const current = getScanCount();
-  localStorage.setItem(SCAN_COUNT_KEY, (current + 1).toString());
+  // Wait for any previous increment operation to complete
+  await scanCountMutex;
+  
+  // Create a new mutex for this operation
+  scanCountMutex = (async () => {
+    try {
+      const current = getScanCount();
+      localStorage.setItem(SCAN_COUNT_KEY, (current + 1).toString());
+    } finally {
+      // Release the mutex
+      scanCountMutex = Promise.resolve();
+    }
+  })();
+  
+  await scanCountMutex;
 }
 
 // Check if user can scan

@@ -17,6 +17,9 @@ export interface SavedReport {
 const REPORTS_STORAGE_KEY = "vettcode_saved_reports";
 const MAX_REPORTS = 50; // Limit to prevent localStorage overflow
 
+// Simple mutex for localStorage operations to prevent race conditions
+let reportStorageMutex = Promise.resolve();
+
 /**
  * Get all saved reports for the current user
  */
@@ -40,13 +43,13 @@ export function getSavedReports(): SavedReport[] {
 }
 
 /**
- * Save a new report
+ * Save a new report with mutex to prevent race conditions
  */
-export function saveReport(
+export async function saveReport(
   projectName: string,
   report: VettReport,
   scanMode: "quick" | "deep" = "quick"
-): SavedReport {
+): Promise<SavedReport> {
   if (typeof window === "undefined") throw new Error("Cannot save reports on server");
   
   const user = getAuthUser();
@@ -60,24 +63,33 @@ export function saveReport(
     scanMode,
   };
   
-  const existingReports = getSavedReports();
+  // Wait for any previous storage operation to complete
+  await reportStorageMutex;
   
-  // Add new report at the beginning
-  const updatedReports = [savedReport, ...existingReports];
+  // Create a new mutex for this operation
+  reportStorageMutex = (async () => {
+    try {
+      const existingReports = getSavedReports();
+      
+      // Add new report at the beginning
+      const updatedReports = [savedReport, ...existingReports];
+      
+      // Limit to MAX_REPORTS
+      const limitedReports = updatedReports.slice(0, MAX_REPORTS);
+      
+      localStorage.setItem(
+        `${REPORTS_STORAGE_KEY}_${user.id}`,
+        JSON.stringify(limitedReports)
+      );
+    } finally {
+      // Release the mutex
+      reportStorageMutex = Promise.resolve();
+    }
+  })();
   
-  // Limit to MAX_REPORTS
-  const limitedReports = updatedReports.slice(0, MAX_REPORTS);
+  await reportStorageMutex;
   
-  try {
-    localStorage.setItem(
-      `${REPORTS_STORAGE_KEY}_${user.id}`,
-      JSON.stringify(limitedReports)
-    );
-    return savedReport;
-  } catch (error) {
-    console.error("Error saving report:", error);
-    throw new Error("Failed to save report. Storage may be full.");
-  }
+  return savedReport;
 }
 
 /**

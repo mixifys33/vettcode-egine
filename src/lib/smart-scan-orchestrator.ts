@@ -39,7 +39,8 @@ export async function runSmartScan(
   files: CodeFile[],
   ignoredCount: number,
   onProgress: (phase: string, pct: number, detail?: string) => void,
-  mode: ScanMode = "quick"
+  mode: ScanMode = "quick",
+  allFilePaths?: string[] // All file paths (before filtering) for building complete file tree
 ): Promise<SmartScanResult> {
   const aiFiles =
     mode === "quick" ? selectFilesForQuickScan(files) : files;
@@ -227,7 +228,7 @@ export async function runSmartScan(
       reportConfidence: reportConfidence.score,
       reportConfidenceGrade: reportConfidence.grade,
       reportConfidenceExplanation: reportConfidence.explanation,
-      fileTree: buildFileTree(files),
+      fileTree: allFilePaths && allFilePaths.length > 0 ? buildFileTreeFromPaths(allFilePaths) : buildFileTree(files),
       // AI analysis stats
       staticFindings: deduplicated.filter(f => f.source === "static").length,
       aiFindings: deduplicated.filter(f => f.source === "ai").length,
@@ -710,13 +711,17 @@ function generatePrevention(finding: StaticFinding): string {
 
 
 function buildFileTree(files: CodeFile[]): FileTreeNode[] {
+  return buildFileTreeFromPaths(files.map(f => f.path));
+}
+
+function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
   const root: Map<string, FileTreeNode> = new Map();
 
-  console.log(`[buildFileTree] Processing ${files.length} files`);
-  console.log(`[buildFileTree] Sample paths:`, files.slice(0, 5).map(f => f.path));
+  console.log(`[buildFileTreeFromPaths] Processing ${paths.length} paths`);
+  console.log(`[buildFileTreeFromPaths] Sample paths:`, paths.slice(0, 5));
 
-  for (const file of files) {
-    const parts = file.path.split("/").filter(Boolean);
+  for (const path of paths) {
+    const parts = path.split("/").filter(Boolean);
     let currentLevel = root;
     let currentPath = "";
 
@@ -754,7 +759,8 @@ function buildFileTree(files: CodeFile[]): FileTreeNode[] {
     }
   }
 
-  console.log(`[buildFileTree] Built tree with ${root.size} root nodes`);
+  console.log(`[buildFileTreeFromPaths] Built tree with ${root.size} root nodes`);
+  console.log(`[buildFileTreeFromPaths] Root nodes:`, Array.from(root.values()).map(n => ({ name: n.name, type: n.type, childrenCount: n.children?.length || 0 })));
 
   // Convert map to sorted array
   const sortNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {

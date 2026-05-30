@@ -46,6 +46,11 @@ export function getModels(): string[] {
   return models.slice(0, 3);
 }
 
+// Rate limiting per API key to prevent exhaustion
+const keyUsageMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute window
+const MAX_REQUESTS_PER_KEY = 100; // Max requests per key per minute
+
 export function nextApiKey(): string {
   const keys = getApiKeys();
   if (keys.length === 0) {
@@ -53,9 +58,31 @@ export function nextApiKey(): string {
       "No OpenRouter API keys configured. Set OPENROUTER_API_KEY_1, _2, _3 or OPENROUTER_API_KEYS."
     );
   }
-  const key = keys[keyIndex % keys.length];
-  keyIndex += 1;
-  return key;
+  
+  const now = Date.now();
+  
+  // Try to find a key that hasn't exceeded rate limit
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[(keyIndex + i) % keys.length];
+    const usage = keyUsageMap.get(key);
+    
+    // Reset usage if window has expired
+    if (usage && now - usage.resetTime > RATE_LIMIT_WINDOW) {
+      keyUsageMap.set(key, { count: 1, resetTime: now });
+      keyIndex = (keyIndex + i + 1) % keys.length;
+      return key;
+    }
+    
+    // Check if key is under rate limit
+    if (!usage || usage.count < MAX_REQUESTS_PER_KEY) {
+      keyUsageMap.set(key, { count: (usage?.count || 0) + 1, resetTime: usage?.resetTime || now });
+      keyIndex = (keyIndex + i + 1) % keys.length;
+      return key;
+    }
+  }
+  
+  // All keys are rate limited
+  throw new Error("All API keys have exceeded rate limit. Please wait before retrying.");
 }
 
 export function keyForIndex(index: number): string {
@@ -179,7 +206,8 @@ export async function chatCompletion(
       
       if (attempt === retries) {
         console.error(`[OpenRouter] ✗ All attempts failed:`, error);
-        throw error;
+        // Return a graceful fallback instead of throwing
+        throw new Error(`API request failed after ${retries + 1} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       console.warn(`[OpenRouter] Attempt ${attempt + 1} failed, retrying...`, error);
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -191,6 +219,26 @@ export async function chatCompletion(
 
 export function parseJsonFromModel<T>(raw: string): T {
   const trimmed = raw.trim();
+  
+  // Validate input is a string and not empty
+  if (typeof trimmed !== 'string' || trimmed.length === 0) {
+    throw new Error('Invalid input: empty or non-string value');
+  }
+  
+  // Check for potentially malicious patterns
+  const dangerousPatterns = [
+    /<script/i,
+    /javascript:/i,
+    /on\w+\s*=/i,
+    /eval\s*\(/i,
+    /Function\s*\(/i,
+  ];
+  
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(trimmed)) {
+      throw new Error('Potentially malicious content detected in JSON');
+    }
+  }
   
   // Try to extract JSON from markdown code blocks
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -205,7 +253,26 @@ export function parseJsonFromModel<T>(raw: string): T {
   }
   
   try {
-    return JSON.parse(jsonStr) as T;
+    const parsed = JSON.parse(jsonStr);
+    // Validate parsed object is not a function or contains functions
+    if (typeof parsed === 'function') {
+      throw new Error('Invalid JSON: function detected');
+    }
+    // Recursively check for functions in objects
+    const checkForFunctions = (obj: any): void => {
+      if (typeof obj === 'function') {
+        throw new Error('Invalid JSON: function detected in object');
+      }
+      if (obj && typeof obj === 'object') {
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            checkForFunctions(obj[key]);
+          }
+        }
+      }
+    };
+    checkForFunctions(parsed);
+    return parsed as T;
   } catch (error) {
     // Log initial parse error
     if (error instanceof Error) {
@@ -219,7 +286,25 @@ export function parseJsonFromModel<T>(raw: string): T {
         .replace(/([^\\])"([^"]*)":/g, '$1\\"$2":') // Fix keys
         .replace(/: "([^"]*)"([^,}\]])/g, ': "$1\\"$2'); // Fix values
       
-      return JSON.parse(fixed) as T;
+      const parsed = JSON.parse(fixed);
+      // Validate parsed object
+      if (typeof parsed === 'function') {
+        throw new Error('Invalid JSON: function detected');
+      }
+      const checkForFunctions = (obj: any): void => {
+        if (typeof obj === 'function') {
+          throw new Error('Invalid JSON: function detected in object');
+        }
+        if (obj && typeof obj === 'object') {
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              checkForFunctions(obj[key]);
+            }
+          }
+        }
+      };
+      checkForFunctions(parsed);
+      return parsed as T;
     } catch (fixError) {
       console.error('[JSON Parse] Failed to parse JSON:', jsonStr.substring(0, 500));
       console.error('[JSON Parse] Fix attempt also failed:', fixError);

@@ -24,6 +24,7 @@ export interface CollectResult {
   ignoredCount: number;
   totalBytes: number;
   warnings: string[];
+  allFilePaths?: string[]; // All file paths (before filtering) for building complete file tree
 }
 
 export async function collectFromFileList(
@@ -38,6 +39,9 @@ export async function collectFromFileList(
   const items = Array.from(fileList);
   console.log(`[collectFromFileList] Total files: ${items.length}`);
 
+  // Collect all file paths first for building the complete file tree
+  const allFilePaths: string[] = [];
+
   for (const file of items) {
     // Use webkitRelativePath for folder uploads to preserve full directory structure
     const rawPath =
@@ -45,7 +49,9 @@ export async function collectFromFileList(
       file.name;
     const path = rawPath.replace(/\\/g, "/");
 
-    console.log(`[collectFromFileList] File path: ${path}, webkitRelativePath: ${(file as File & { webkitRelativePath?: string }).webkitRelativePath}`);
+    allFilePaths.push(path);
+
+    console.log(`[collectFromFileList] File path: ${path}, webkitRelativePath: ${(file as File & { webkitRelativePath?: string }).webkitRelativePath}, ignored: ${shouldIgnorePath(path)}`);
 
     if (shouldIgnorePath(path)) {
       ignoredCount++;
@@ -95,7 +101,7 @@ export async function collectFromFileList(
   }
 
   void projectName;
-  return { files, ignoredCount, totalBytes, warnings };
+  return { files, ignoredCount, totalBytes, warnings, allFilePaths };
 }
 
 export async function collectFromZip(
@@ -112,6 +118,9 @@ export async function collectFromZip(
   const entries = Object.keys(zip.files).filter(
     (name) => !zip.files[name].dir
   );
+
+  // Collect all file paths first for building the complete file tree
+  const allFilePaths: string[] = entries.map(path => path.replace(/\\/g, "/"));
 
   for (const path of entries) {
     const normalized = path.replace(/\\/g, "/");
@@ -147,5 +156,5 @@ export async function collectFromZip(
   }
 
   void projectName;
-  return { files, ignoredCount, totalBytes, warnings };
+  return { files, ignoredCount, totalBytes, warnings, allFilePaths };
 }

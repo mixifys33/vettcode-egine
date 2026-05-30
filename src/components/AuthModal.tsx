@@ -120,134 +120,51 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     try {
       setGoogleAuthStep("Verifying your Google account...");
       
-      // Decode the JWT token from Google
+      // Send the raw Google credential (JWT) to backend for verification
+      // Backend should verify the signature, expiration, and audience
       const credential = response.credential;
-      const payload = JSON.parse(atob(credential.split('.')[1]));
       
-      const googleEmail = payload.email;
-      const googleName = payload.name;
+      setGoogleAuthStep("Authenticating with backend...");
       
-      setGoogleAuthStep("Checking your account...");
-      
-      // Check if seller already exists (try to login first)
-      const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/login`, {
+      // Send credential to backend for OAuth login/registration
+      const oauthRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/google-oauth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: googleEmail.toLowerCase(),
-          password: `google_oauth_${payload.sub}`, // Google OAuth identifier
+          credential, // Send the raw JWT for server-side verification
         }),
       });
 
-      if (loginRes.ok) {
-        // Seller exists - login successful
-        setGoogleAuthStep("Signing you in...");
-        
-        const loginData = await loginRes.json();
-        
-        const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
-        
-        setAuthUser({
-          id: loginData.seller.id,
-          name: loginData.seller.name,
-          email: loginData.seller.email,
-          token,
-          userType: "Seller",
-        });
-
-        resetScanCount();
-        
-        setGoogleAuthStep("Success! Redirecting...");
-        setTimeout(() => {
-          onSuccess();
-        }, 500);
-      } else {
-        // Seller doesn't exist - register new seller
-        setGoogleAuthStep("Creating your account...");
-        
-        const randomPhone = `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-        
-        const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/register`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: googleName,
-            email: googleEmail.toLowerCase(),
-            phoneNumber: randomPhone, // Placeholder phone
-            password: `google_oauth_${payload.sub}`, // Google OAuth identifier
-            skipOTP: true, // Skip OTP for Google users
-          }),
-        });
-
-        const registerData = await registerRes.json();
-
-        if (!registerRes.ok) {
-          // Handle specific error cases
-          if (registerData.message?.includes("already exists") || registerData.error?.includes("already exists")) {
-            // Email exists but password doesn't match - this shouldn't happen
-            throw new Error("An account with this email already exists. Please try signing in instead.");
-          }
-          throw new Error(registerData.message || registerData.error || "Registration failed");
-        }
-
-        setGoogleAuthStep("Finalizing your account...");
-
-        // Check if account was created directly (Google OAuth users skip OTP)
-        if (registerData.seller && registerData.seller.id) {
-          // Account created directly - login immediately
-          const token = `vettcode_${registerData.seller.id}_${Date.now()}`;
-          
-          setAuthUser({
-            id: registerData.seller.id,
-            name: registerData.seller.name,
-            email: registerData.seller.email,
-            token,
-            userType: "Seller",
-          });
-
-          resetScanCount();
-          
-          setGoogleAuthStep("Success! Redirecting...");
-          setTimeout(() => {
-            onSuccess();
-          }, 500);
-        } else {
-          // Old flow - needs OTP verification (shouldn't happen for Google users)
-          setGoogleAuthStep("Verifying your account...");
-          
-          const verifyRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/verify`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: googleEmail.toLowerCase(),
-              otp: "GOOGLE_AUTO_VERIFY",
-            }),
-          });
-
-          if (verifyRes.ok) {
-            const verifyData = await verifyRes.json();
-            
-            const token = `vettcode_${verifyData.seller.id}_${Date.now()}`;
-            
-            setAuthUser({
-              id: verifyData.seller.id,
-              name: verifyData.seller.name,
-              email: verifyData.seller.email,
-              token,
-              userType: "Seller",
-            });
-
-            resetScanCount();
-            
-            setGoogleAuthStep("Success! Redirecting...");
-            setTimeout(() => {
-              onSuccess();
-            }, 500);
-          } else {
-            throw new Error("Failed to verify Google account");
-          }
-        }
+      if (!oauthRes.ok) {
+        const errorData = await oauthRes.json();
+        throw new Error(errorData.message || errorData.error || "Google authentication failed");
       }
+
+      const oauthData = await oauthRes.json();
+      
+      // Backend should return a secure token (JWT or session ID)
+      const token = oauthData.token || oauthData.sessionToken;
+      
+      if (!token) {
+        throw new Error("Authentication failed: No token received from server");
+      }
+      
+      setGoogleAuthStep("Signing you in...");
+      
+      setAuthUser({
+        id: oauthData.seller.id,
+        name: oauthData.seller.name,
+        email: oauthData.seller.email,
+        token, // Use server-generated secure token
+        userType: "Seller",
+      });
+
+      resetScanCount();
+      
+      setGoogleAuthStep("Success! Redirecting...");
+      setTimeout(() => {
+        onSuccess();
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google authentication failed");
       setGoogleAuthInProgress(false);

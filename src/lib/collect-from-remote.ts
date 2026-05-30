@@ -27,6 +27,7 @@ export async function collectFromRemoteUrl(
       totalBytes: data.totalBytes ?? 0,
       warnings: data.warnings ?? [],
       projectName: data.projectName,
+      allFilePaths: data.allFilePaths,
     };
   } catch (error) {
     clearTimeout(timeoutId);

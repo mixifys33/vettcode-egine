@@ -24,9 +24,13 @@ import {
   Wrench,
   FileCheck,
 } from "lucide-react";
+import DOMPurify from "dompurify";
 
 function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
   const [isOpen, setIsOpen] = useState(level < 2);
+
+  // Sanitize file names to prevent XSS attacks
+  const sanitizedName = DOMPurify.sanitize(node.name, { ALLOWED_TAGS: [] });
 
   if (node.type === "file") {
     return (
@@ -34,7 +38,7 @@ function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number 
         className="file-tree-item"
         style={{ paddingLeft: `${level * 16}px` }}
       >
-        📄 {node.name}
+        📄 {sanitizedName}
       </div>
     );
   }
@@ -51,7 +55,7 @@ function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number 
           if (e.key === "Enter" || e.key === " ") setIsOpen(!isOpen);
         }}
       >
-        {isOpen ? "📂" : "📁"} {node.name}
+        {isOpen ? "📂" : "📁"} {sanitizedName}
         {node.children?.length ? ` (${node.children.length})` : ""}
       </div>
       {isOpen &&
