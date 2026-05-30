@@ -11,71 +11,110 @@ interface PreListModalProps {
 }
 
 export interface PreListFormData {
-  projectName: string;
-  projectDescription: string;
+  appName: string;
+  shortDescription: string;
   detailedDescription: string;
-  category: string;
-  subCategory: string;
   tags: string;
-  regularPrice: string;
-  salePrice: string;
+  appCategory: string;
+  technologyStack: string[];
+  price: string;
+  currency: string;
+  isFree: boolean;
   licenseType: string;
-  demoUrl: string;
+  liveDemo: string;
+  githubRepo: string;
   documentationUrl: string;
-  videoUrl: string;
-  features: string[];
-  images: File[];
+  videoDemo: string;
+  supportedPlatforms: string[];
+  dependencies: string[];
+  commercialUse: string;
+  resaleRights: string;
+  supportLevel: string;
+  updateFrequency: string;
+  warranty: string;
+  installationSupport: string;
+  screenshots: File[];
+  appIcon: File | null;
 }
 
-const CATEGORIES = {
-  "Web Applications": ["SaaS", "E-commerce", "CMS", "Dashboard", "Landing Page", "Portfolio"],
-  "Mobile Applications": ["iOS", "Android", "React Native", "Flutter", "Hybrid"],
-  "Desktop Applications": ["Windows", "macOS", "Linux", "Cross-platform"],
-  "APIs & Backend": ["REST API", "GraphQL", "Microservices", "Authentication", "Database"],
-  "Libraries & Packages": ["npm Package", "Python Package", "Component Library", "Utility Library"],
-  "Scripts & Automation": ["Build Tools", "CLI Tools", "Automation Scripts", "DevOps"],
-  "Games": ["Web Games", "Mobile Games", "Desktop Games", "Game Engines"],
-  "AI & ML": ["Machine Learning", "Data Science", "NLP", "Computer Vision"],
-};
+const APP_CATEGORIES = [
+  'Web Application',
+  'Mobile App (React Native)',
+  'Mobile App (Native iOS)',
+  'Mobile App (Native Android)',
+  'Desktop Application',
+  'API/Backend Service',
+  'Chrome Extension',
+  'WordPress Plugin',
+  'NPM Package/Library',
+  'CLI Tool',
+  'Game',
+  'E-commerce Solution',
+  'CMS/Blog Platform',
+  'Dashboard/Admin Panel',
+  'Other'
+];
 
-const LICENSE_TYPES = ["MIT", "Apache 2.0", "GPL", "Commercial", "Proprietary", "Other"];
+const LICENSE_TYPES = ["MIT License", "Apache 2.0", "GPL", "Commercial", "Proprietary", "Other"];
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'UGX', 'KES', 'TZS', 'RWF'];
+const SUPPORT_LEVELS = ['Community', 'Email', 'Priority', 'Enterprise'];
+const UPDATE_FREQUENCIES = ['Active', 'Maintenance', 'Deprecated'];
+const COMMERCIAL_USE_OPTIONS = ['Yes', 'No', 'With License'];
+const RESALE_RIGHTS_OPTIONS = ['Yes', 'No', 'With License'];
+const INSTALLATION_SUPPORT_OPTIONS = ['Yes', 'No', 'Paid'];
+const WARRANTY_OPTIONS = ['30 days', '60 days', '90 days', '1 year', 'No warranty'];
 
 export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModalProps) {
   const [formData, setFormData] = useState<PreListFormData>({
-    projectName: report.metadata?.projectName || "Untitled Project",
-    projectDescription: report.summary || "",
+    appName: report.metadata?.projectName || "Untitled Application",
+    shortDescription: report.summary || "",
     detailedDescription: "",
-    category: "",
-    subCategory: "",
     tags: "",
-    regularPrice: "",
-    salePrice: "",
-    licenseType: "Commercial",
-    demoUrl: "",
+    appCategory: "",
+    technologyStack: [],
+    price: "",
+    currency: "USD",
+    isFree: false,
+    licenseType: "MIT License",
+    liveDemo: "",
+    githubRepo: "",
     documentationUrl: "",
-    videoUrl: "",
-    features: [""],
-    images: [],
+    videoDemo: "",
+    supportedPlatforms: [],
+    dependencies: [],
+    commercialUse: "Yes",
+    resaleRights: "No",
+    supportLevel: "Community",
+    updateFrequency: "Active",
+    warranty: "30 days",
+    installationSupport: "Yes",
+    screenshots: [],
+    appIcon: null,
   });
 
-  const [imagePreview, setImagePreview] = useState<string[]>([]);
+  const [screenshotPreview, setScreenshotPreview] = useState<string[]>([]);
+  const [appIconPreview, setAppIconPreview] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Auto-fill tags from scan
+  // Auto-fill tags and technology stack from scan
   useEffect(() => {
     if (isOpen && !formData.tags) {
       const languages = extractLanguages(report);
       const frameworks = extractFrameworks(report);
       const autoTags = [...languages, ...frameworks].join(", ");
-      setFormData(prev => ({ ...prev, tags: autoTags }));
+      const autoTechStack = [...languages, ...frameworks];
+      setFormData(prev => ({ 
+        ...prev, 
+        tags: autoTags,
+        technologyStack: autoTechStack.length > 0 ? autoTechStack : prev.technologyStack
+      }));
     }
   }, [isOpen, report]);
 
   const extractLanguages = (report: VettReport): string[] => {
     const languages = new Set<string>();
     
-    // Extract from file extensions
     report.findings.forEach((finding) => {
       if (finding.file) {
         const ext = finding.file.split('.').pop()?.toLowerCase();
@@ -136,29 +175,58 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
     setError("");
   };
 
-  const handleFeatureChange = (index: number, value: string) => {
-    const newFeatures = [...formData.features];
-    newFeatures[index] = value;
-    setFormData(prev => ({ ...prev, features: newFeatures }));
+  const handleTechnologyStackChange = (index: number, value: string) => {
+    const newStack = [...formData.technologyStack];
+    newStack[index] = value;
+    setFormData(prev => ({ ...prev, technologyStack: newStack }));
   };
 
-  const addFeature = () => {
-    setFormData(prev => ({ ...prev, features: [...prev.features, ""] }));
+  const addTechnologyStack = () => {
+    setFormData(prev => ({ ...prev, technologyStack: [...prev.technologyStack, ""] }));
   };
 
-  const removeFeature = (index: number) => {
-    const newFeatures = formData.features.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, features: newFeatures.length > 0 ? newFeatures : [""] }));
+  const removeTechnologyStack = (index: number) => {
+    const newStack = formData.technologyStack.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, technologyStack: newStack.length > 0 ? newStack : [""] }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSupportedPlatformsChange = (index: number, value: string) => {
+    const newPlatforms = [...formData.supportedPlatforms];
+    newPlatforms[index] = value;
+    setFormData(prev => ({ ...prev, supportedPlatforms: newPlatforms }));
+  };
+
+  const addSupportedPlatform = () => {
+    setFormData(prev => ({ ...prev, supportedPlatforms: [...prev.supportedPlatforms, ""] }));
+  };
+
+  const removeSupportedPlatform = (index: number) => {
+    const newPlatforms = formData.supportedPlatforms.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, supportedPlatforms: newPlatforms.length > 0 ? newPlatforms : [""] }));
+  };
+
+  const handleDependenciesChange = (index: number, value: string) => {
+    const newDependencies = [...formData.dependencies];
+    newDependencies[index] = value;
+    setFormData(prev => ({ ...prev, dependencies: newDependencies }));
+  };
+
+  const addDependency = () => {
+    setFormData(prev => ({ ...prev, dependencies: [...prev.dependencies, ""] }));
+  };
+
+  const removeDependency = (index: number) => {
+    const newDependencies = formData.dependencies.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, dependencies: newDependencies.length > 0 ? newDependencies : [""] }));
+  };
+
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + formData.images.length > 5) {
-      setError("Maximum 5 images allowed");
+    if (files.length + formData.screenshots.length > 5) {
+      setError("Maximum 5 screenshots allowed");
       return;
     }
 
-    // Validate file sizes (max 5MB per image)
     const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
     const oversizedFiles = files.filter(file => file.size > MAX_IMAGE_SIZE);
     if (oversizedFiles.length > 0) {
@@ -166,7 +234,6 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
       return;
     }
 
-    // Validate file types
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     const invalidFiles = files.filter(file => !validTypes.includes(file.type));
     if (invalidFiles.length > 0) {
@@ -174,49 +241,81 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
       return;
     }
 
-    setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
+    setFormData(prev => ({ ...prev, screenshots: [...prev.screenshots, ...files] }));
 
-    // Generate previews
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(prev => [...prev, reader.result as string]);
+        setScreenshotPreview(prev => [...prev, reader.result as string]);
       };
       reader.readAsDataURL(file);
     });
   };
 
-  const removeImage = (index: number) => {
+  const removeScreenshot = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      screenshots: prev.screenshots.filter((_, i) => i !== index)
     }));
-    setImagePreview(prev => prev.filter((_, i) => i !== index));
+    setScreenshotPreview(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAppIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError("App icon too large. Maximum size is 2MB.");
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError("Invalid file type. Only JPG, PNG, and WebP images are allowed for app icon.");
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, appIcon: file }));
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAppIconPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAppIcon = () => {
+    setFormData(prev => ({ ...prev, appIcon: null }));
+    setAppIconPreview("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validation
-    if (!formData.projectName.trim()) {
-      setError("Project name is required");
+    if (!formData.appName.trim()) {
+      setError("Application name is required");
       return;
     }
-    if (!formData.category || !formData.subCategory) {
-      setError("Please select category and subcategory");
+    if (!formData.shortDescription.trim()) {
+      setError("Short description is required");
       return;
     }
-    if (!formData.regularPrice || !formData.salePrice) {
-      setError("Please set both regular and sale price");
+    if (!formData.appCategory) {
+      setError("Please select an application category");
       return;
     }
-    if (parseFloat(formData.salePrice) > parseFloat(formData.regularPrice)) {
-      setError("Sale price cannot be higher than regular price");
+    if (!formData.isFree && !formData.price) {
+      setError("Please set a price or mark as free");
       return;
     }
-    if (formData.images.length === 0) {
-      setError("Please upload at least one product image");
+    if (formData.screenshots.length === 0) {
+      setError("Please upload at least one screenshot");
+      return;
+    }
+    if (!formData.appIcon) {
+      setError("Please upload an app icon");
       return;
     }
 
@@ -233,8 +332,6 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
 
   if (!isOpen) return null;
 
-  const subCategories = formData.category ? CATEGORIES[formData.category as keyof typeof CATEGORIES] || [] : [];
-
   return (
     <div style={{
       position: "fixed",
@@ -250,330 +347,203 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
       <div style={{
         background: "var(--bg)",
         borderRadius: "12px",
-        maxWidth: "800px",
+        maxWidth: "900px",
         width: "100%",
         maxHeight: "90vh",
         overflowY: "auto",
-        border: "2px solid var(--border)",
-        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)"
+        padding: "2rem",
+        position: "relative"
       }}>
-        {/* Header */}
-        <div style={{
-          padding: "1.5rem",
-          borderBottom: "1px solid var(--border)",
-          position: "sticky",
-          top: 0,
-          background: "var(--bg)",
-          zIndex: 1
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "1rem",
+            right: "1rem",
+            background: "transparent",
+            border: "none",
+            fontSize: "1.5rem",
+            cursor: "pointer",
+            color: "var(--text)"
+          }}
+        >
+          ×
+        </button>
+
+        <h2 style={{
+          fontSize: "1.75rem",
+          fontWeight: 700,
+          marginBottom: "0.5rem",
+          background: "linear-gradient(90deg, var(--accent), var(--primary))",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent"
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.25rem" }}>
-                Complete Your Pre-Listing
-              </h2>
-              <p style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
-                Fill in product details to prepare for launch
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: "transparent",
-                border: "none",
-                fontSize: "1.5rem",
-                cursor: "pointer",
-                color: "var(--muted)",
-                padding: "0.5rem"
-              }}
-            >
-              ✕
-            </button>
+          Complete Your Pre-Listing
+        </h2>
+        <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
+          Fill in application details to prepare for launch
+        </p>
+
+        {error && (
+          <div style={{
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid var(--danger)",
+            borderRadius: "8px",
+            padding: "1rem",
+            marginBottom: "1rem",
+            color: "var(--danger)"
+          }}>
+            {error}
           </div>
-        </div>
+        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: "1.5rem" }}>
-          {error && (
-            <div style={{
-              padding: "1rem",
-              background: "rgba(244, 63, 94, 0.1)",
-              border: "1px solid var(--danger)",
-              borderRadius: "8px",
-              color: "var(--danger)",
-              marginBottom: "1.5rem"
-            }}>
-              {error}
-            </div>
-          )}
-
+        <form onSubmit={handleSubmit}>
           {/* Basic Information */}
-          <div style={{ marginBottom: "1.5rem" }}>
+          <div style={{ marginBottom: "2rem" }}>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
               Basic Information
             </h3>
             
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Project Name *
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Application Name *
               </label>
               <input
                 type="text"
-                value={formData.projectName}
-                onChange={(e) => handleInputChange("projectName", e.target.value)}
+                value={formData.appName}
+                onChange={(e) => handleInputChange('appName', e.target.value)}
+                placeholder="Enter application name"
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
-                required
               />
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Short Description *
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Short Description * (max 200 characters)
               </label>
               <textarea
-                value={formData.projectDescription}
-                onChange={(e) => handleInputChange("projectDescription", e.target.value)}
-                rows={3}
+                value={formData.shortDescription}
+                onChange={(e) => handleInputChange('shortDescription', e.target.value)}
+                placeholder="Brief description of your application"
+                maxLength={200}
+                rows={2}
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem",
-                  resize: "vertical"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
-                required
               />
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textAlign: "right" }}>
+                {formData.shortDescription.length}/200
+              </div>
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Detailed Description
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Detailed Description *
               </label>
               <textarea
                 value={formData.detailedDescription}
-                onChange={(e) => handleInputChange("detailedDescription", e.target.value)}
+                onChange={(e) => handleInputChange('detailedDescription', e.target.value)}
+                placeholder="Detailed description of your application, features, and use cases"
                 rows={5}
-                placeholder="Provide a comprehensive description of your codebase, its features, and use cases..."
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem",
-                  resize: "vertical"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
               />
             </div>
-          </div>
 
-          {/* Category */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
-              Category
-            </h3>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                  Category *
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => {
-                    handleInputChange("category", e.target.value);
-                    handleInputChange("subCategory", "");
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem"
-                  }}
-                  required
-                >
-                  <option value="">Select category</option>
-                  {Object.keys(CATEGORIES).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                  Subcategory *
-                </label>
-                <select
-                  value={formData.subCategory}
-                  onChange={(e) => handleInputChange("subCategory", e.target.value)}
-                  disabled={!formData.category}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem",
-                    opacity: formData.category ? 1 : 0.5
-                  }}
-                  required
-                >
-                  <option value="">Select subcategory</option>
-                  {subCategories.map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-              </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Application Category *
+              </label>
+              <select
+                value={formData.appCategory}
+                onChange={(e) => handleInputChange('appCategory', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                <option value="">Select category</option>
+                {APP_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
 
-            <div style={{ marginTop: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Tags (comma-separated)
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Tags
               </label>
               <input
                 type="text"
                 value={formData.tags}
-                onChange={(e) => handleInputChange("tags", e.target.value)}
-                placeholder="React, TypeScript, API, Authentication"
+                onChange={(e) => handleInputChange('tags', e.target.value)}
+                placeholder="e.g., react, typescript, api"
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
               />
             </div>
           </div>
 
-          {/* Pricing */}
-          <div style={{ marginBottom: "1.5rem" }}>
+          {/* Technology Stack */}
+          <div style={{ marginBottom: "2rem" }}>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
-              Pricing
+              Technology Stack
             </h3>
             
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                  Regular Price (USD) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.regularPrice}
-                  onChange={(e) => handleInputChange("regularPrice", e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem"
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                  Sale Price (USD) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.salePrice}
-                  onChange={(e) => handleInputChange("salePrice", e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem"
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                  License Type
-                </label>
-                <select
-                  value={formData.licenseType}
-                  onChange={(e) => handleInputChange("licenseType", e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem"
-                  }}
-                >
-                  {LICENSE_TYPES.map(license => (
-                    <option key={license} value={license}>{license}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Features */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
-              Key Features
-            </h3>
-            
-            {formData.features.map((feature, index) => (
-              <div key={index} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            {formData.technologyStack.map((tech, index) => (
+              <div key={index} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
                 <input
                   type="text"
-                  value={feature}
-                  onChange={(e) => handleFeatureChange(index, e.target.value)}
-                  placeholder={`Feature ${index + 1}`}
+                  value={tech}
+                  onChange={(e) => handleTechnologyStackChange(index, e.target.value)}
+                  placeholder="Technology or framework"
                   style={{
                     flex: 1,
                     padding: "0.75rem",
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
                     borderRadius: "6px",
-                    color: "var(--text)",
-                    fontSize: "0.95rem"
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text)"
                   }}
                 />
-                {formData.features.length > 1 && (
+                {formData.technologyStack.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeFeature(index)}
+                    onClick={() => removeTechnologyStack(index)}
                     style={{
-                      padding: "0.75rem 1rem",
-                      background: "transparent",
-                      border: "1px solid var(--danger)",
+                      padding: "0.75rem",
                       borderRadius: "6px",
+                      border: "1px solid var(--danger)",
+                      background: "rgba(239, 68, 68, 0.1)",
                       color: "var(--danger)",
                       cursor: "pointer"
                     }}
@@ -583,182 +553,580 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
                 )}
               </div>
             ))}
-            
             <button
               type="button"
-              onClick={addFeature}
+              onClick={addTechnologyStack}
               style={{
-                padding: "0.75rem 1rem",
-                background: "transparent",
-                border: "1px solid var(--accent)",
+                padding: "0.5rem 1rem",
                 borderRadius: "6px",
-                color: "var(--accent)",
-                cursor: "pointer",
-                fontSize: "0.9rem"
+                border: "1px dashed var(--border)",
+                background: "transparent",
+                color: "var(--primary)",
+                cursor: "pointer"
               }}
             >
-              + Add Feature
+              + Add Technology
             </button>
           </div>
 
-          {/* Links */}
-          <div style={{ marginBottom: "1.5rem" }}>
+          {/* Pricing */}
+          <div style={{ marginBottom: "2rem" }}>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
-              Links (Optional)
+              Pricing
             </h3>
             
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Demo URL
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", fontWeight: 500 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.isFree}
+                  onChange={(e) => handleInputChange('isFree', e.target.checked)}
+                  style={{ width: "auto" }}
+                />
+                This application is free
               </label>
-              <input
-                type="url"
-                value={formData.demoUrl}
-                onChange={(e) => handleInputChange("demoUrl", e.target.value)}
-                placeholder="https://demo.example.com"
+            </div>
+
+            {!formData.isFree && (
+              <>
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    Price *
+                  </label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => handleInputChange('price', e.target.value)}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      style={{
+                        flex: 1,
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--border)",
+                        background: "var(--bg-secondary)",
+                        color: "var(--text)"
+                      }}
+                    />
+                    <select
+                      value={formData.currency}
+                      onChange={(e) => handleInputChange('currency', e.target.value)}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--border)",
+                        background: "var(--bg-secondary)",
+                        color: "var(--text)"
+                      }}
+                    >
+                      {CURRENCIES.map(currency => (
+                        <option key={currency} value={currency}>{currency}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                License Type *
+              </label>
+              <select
+                value={formData.licenseType}
+                onChange={(e) => handleInputChange('licenseType', e.target.value)}
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {LICENSE_TYPES.map(license => (
+                  <option key={license} value={license}>{license}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* URLs & Links */}
+          <div style={{ marginBottom: "2rem" }}>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
+              URLs & Links
+            </h3>
+            
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Live Demo URL
+              </label>
+              <input
+                type="url"
+                value={formData.liveDemo}
+                onChange={(e) => handleInputChange('liveDemo', e.target.value)}
+                placeholder="https://"
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
               />
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                GitHub Repository URL
+              </label>
+              <input
+                type="url"
+                value={formData.githubRepo}
+                onChange={(e) => handleInputChange('githubRepo', e.target.value)}
+                placeholder="https://github.com/"
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
                 Documentation URL
               </label>
               <input
                 type="url"
                 value={formData.documentationUrl}
-                onChange={(e) => handleInputChange("documentationUrl", e.target.value)}
-                placeholder="https://docs.example.com"
+                onChange={(e) => handleInputChange('documentationUrl', e.target.value)}
+                placeholder="https://"
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
               />
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
-                Video URL (YouTube, Vimeo, etc.)
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Video Demo URL
               </label>
               <input
                 type="url"
-                value={formData.videoUrl}
-                onChange={(e) => handleInputChange("videoUrl", e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
+                value={formData.videoDemo}
+                onChange={(e) => handleInputChange('videoDemo', e.target.value)}
+                placeholder="https://youtube.com/"
                 style={{
                   width: "100%",
                   padding: "0.75rem",
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
                   borderRadius: "6px",
-                  color: "var(--text)",
-                  fontSize: "0.95rem"
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
                 }}
               />
             </div>
           </div>
 
-          {/* Images */}
-          <div style={{ marginBottom: "1.5rem" }}>
+          {/* Platform & Dependencies */}
+          <div style={{ marginBottom: "2rem" }}>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
-              Product Images * (Max 5)
+              Platform & Dependencies
             </h3>
             
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageChange}
-              style={{ display: "none" }}
-              id="image-upload"
-            />
-            
-            <label
-              htmlFor="image-upload"
-              style={{
-                display: "block",
-                padding: "2rem",
-                border: "2px dashed var(--border)",
-                borderRadius: "8px",
-                textAlign: "center",
-                cursor: "pointer",
-                background: "var(--bg-secondary)",
-                marginBottom: "1rem"
-              }}
-            >
-              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📸</div>
-              <div style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
-                Click to upload images (PNG, JPG, WebP)
-              </div>
-            </label>
-
-            {imagePreview.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "1rem" }}>
-                {imagePreview.map((preview, index) => (
-                  <div key={index} style={{ position: "relative" }}>
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      style={{
-                        width: "100%",
-                        height: "120px",
-                        objectFit: "cover",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border)"
-                      }}
-                    />
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Supported Platforms
+              </label>
+              {formData.supportedPlatforms.map((platform, index) => (
+                <div key={index} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <input
+                    type="text"
+                    value={platform}
+                    onChange={(e) => handleSupportedPlatformsChange(index, e.target.value)}
+                    placeholder="e.g., Windows, macOS, Linux"
+                    style={{
+                      flex: 1,
+                      padding: "0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-secondary)",
+                      color: "var(--text)"
+                    }}
+                  />
+                  {formData.supportedPlatforms.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => removeImage(index)}
+                      onClick={() => removeSupportedPlatform(index)}
                       style={{
-                        position: "absolute",
-                        top: "0.5rem",
-                        right: "0.5rem",
-                        background: "var(--danger)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "50%",
-                        width: "24px",
-                        height: "24px",
-                        cursor: "pointer",
-                        fontSize: "0.8rem"
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--danger)",
+                        background: "rgba(239, 68, 68, 0.1)",
+                        color: "var(--danger)",
+                        cursor: "pointer"
                       }}
                     >
-                      ✕
+                      Remove
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSupportedPlatform}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "1px dashed var(--border)",
+                  background: "transparent",
+                  color: "var(--primary)",
+                  cursor: "pointer"
+                }}
+              >
+                + Add Platform
+              </button>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Dependencies
+              </label>
+              {formData.dependencies.map((dep, index) => (
+                <div key={index} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <input
+                    type="text"
+                    value={dep}
+                    onChange={(e) => handleDependenciesChange(index, e.target.value)}
+                    placeholder="e.g., node >= 14, python >= 3.8"
+                    style={{
+                      flex: 1,
+                      padding: "0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-secondary)",
+                      color: "var(--text)"
+                    }}
+                  />
+                  {formData.dependencies.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeDependency(index)}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--danger)",
+                        background: "rgba(239, 68, 68, 0.1)",
+                        color: "var(--danger)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addDependency}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "1px dashed var(--border)",
+                  background: "transparent",
+                  color: "var(--primary)",
+                  cursor: "pointer"
+                }}
+              >
+                + Add Dependency
+              </button>
+            </div>
           </div>
 
-          {/* Submit Buttons */}
-          <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
+          {/* Commercial Terms */}
+          <div style={{ marginBottom: "2rem" }}>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
+              Commercial Terms
+            </h3>
+            
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Commercial Use
+              </label>
+              <select
+                value={formData.commercialUse}
+                onChange={(e) => handleInputChange('commercialUse', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {COMMERCIAL_USE_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Resale Rights
+              </label>
+              <select
+                value={formData.resaleRights}
+                onChange={(e) => handleInputChange('resaleRights', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {RESALE_RIGHTS_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Support Level
+              </label>
+              <select
+                value={formData.supportLevel}
+                onChange={(e) => handleInputChange('supportLevel', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {SUPPORT_LEVELS.map(level => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Update Frequency
+              </label>
+              <select
+                value={formData.updateFrequency}
+                onChange={(e) => handleInputChange('updateFrequency', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {UPDATE_FREQUENCIES.map(freq => (
+                  <option key={freq} value={freq}>{freq}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Warranty
+              </label>
+              <select
+                value={formData.warranty}
+                onChange={(e) => handleInputChange('warranty', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {WARRANTY_OPTIONS.map(warranty => (
+                  <option key={warranty} value={warranty}>{warranty}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Installation Support
+              </label>
+              <select
+                value={formData.installationSupport}
+                onChange={(e) => handleInputChange('installationSupport', e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              >
+                {INSTALLATION_SUPPORT_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Visual Assets */}
+          <div style={{ marginBottom: "2rem" }}>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
+              Visual Assets
+            </h3>
+            
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                App Icon * (Max 2MB, JPG/PNG/WebP)
+              </label>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleAppIconChange}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              />
+              {appIconPreview && (
+                <div style={{ marginTop: "1rem", position: "relative" }}>
+                  <img
+                    src={appIconPreview}
+                    alt="App Icon Preview"
+                    style={{
+                      width: "100px",
+                      height: "100px",
+                      objectFit: "cover",
+                      borderRadius: "12px",
+                      border: "2px solid var(--border)"
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeAppIcon}
+                    style={{
+                      position: "absolute",
+                      top: "-8px",
+                      right: "-8px",
+                      width: "24px",
+                      height: "24px",
+                      borderRadius: "50%",
+                      background: "var(--danger)",
+                      color: "white",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.75rem"
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Screenshots * (Max 5, Max 5MB each, JPG/PNG/WebP/GIF)
+              </label>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                multiple
+                onChange={handleScreenshotChange}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text)"
+                }}
+              />
+              {screenshotPreview.length > 0 && (
+                <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "0.5rem" }}>
+                  {screenshotPreview.map((preview, index) => (
+                    <div key={index} style={{ position: "relative" }}>
+                      <img
+                        src={preview}
+                        alt={`Screenshot ${index + 1}`}
+                        style={{
+                          width: "100%",
+                          aspectRatio: "16/9",
+                          objectFit: "cover",
+                          borderRadius: "8px",
+                          border: "2px solid var(--border)"
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeScreenshot(index)}
+                        style={{
+                          position: "absolute",
+                          top: "-8px",
+                          right: "-8px",
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: "var(--danger)",
+                          color: "white",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "0.75rem"
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div style={{ display: "flex", gap: "1rem" }}>
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
               style={{
-                padding: "0.75rem 1.5rem",
-                background: "transparent",
-                border: "1px solid var(--border)",
+                flex: 1,
+                padding: "1rem",
                 borderRadius: "8px",
+                border: "1px solid var(--border)",
+                background: "transparent",
                 color: "var(--text)",
-                cursor: "pointer",
-                fontSize: "0.95rem",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                fontSize: "1rem",
                 fontWeight: 600
               }}
             >
@@ -768,18 +1136,19 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
               type="submit"
               disabled={isSubmitting}
               style={{
-                padding: "0.75rem 2rem",
-                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                border: "none",
+                flex: 1,
+                padding: "1rem",
                 borderRadius: "8px",
-                color: "#fff",
+                border: "none",
+                background: "linear-gradient(135deg, var(--accent), var(--primary))",
+                color: "white",
                 cursor: isSubmitting ? "not-allowed" : "pointer",
-                fontSize: "0.95rem",
+                fontSize: "1rem",
                 fontWeight: 600,
-                opacity: isSubmitting ? 0.6 : 1
+                opacity: isSubmitting ? 0.7 : 1
               }}
             >
-              {isSubmitting ? "Submitting..." : "Pre-List My Code"}
+              {isSubmitting ? "Submitting..." : "Submit Pre-Listing"}
             </button>
           </div>
         </form>

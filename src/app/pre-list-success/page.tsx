@@ -6,7 +6,7 @@ import { useEffect, useState, Suspense } from 'react';
 function PreListSuccessContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState({
-    projectName: '',
+    appName: '',
     vettScore: 0,
     vettGrade: '',
     email: ''
@@ -14,7 +14,7 @@ function PreListSuccessContent() {
 
   useEffect(() => {
     setData({
-      projectName: searchParams.get('projectName') || 'Your Project',
+      appName: searchParams.get('appName') || 'Your Project',
       vettScore: parseFloat(searchParams.get('vettScore') || '0'),
       vettGrade: searchParams.get('vettGrade') || 'N/A',
       email: searchParams.get('email') || ''
@@ -75,7 +75,7 @@ function PreListSuccessContent() {
           color: 'var(--text)',
           marginBottom: '2rem'
         }}>
-          Your codebase <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{data.projectName}</span> has been:
+          Your codebase <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{data.appName}</span> has been:
         </p>
 
         {/* Status Badges */}
@@ -243,9 +243,13 @@ export default function PreListSuccessPage() {
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, rgba(34, 211, 165, 0.1) 0%, rgba(91, 124, 250, 0.1) 100%)'
       }}>
-        <div style={{ color: 'var(--muted)' }}>Loading...</div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <p style={{ color: 'var(--text)' }}>Loading...</p>
+        </div>
       </div>
     }>
       <PreListSuccessContent />

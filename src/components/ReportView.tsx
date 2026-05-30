@@ -359,8 +359,8 @@ export function ReportView({
       const submitData = new FormData();
       
       // Add text fields
-      submitData.append("projectName", formData.projectName);
-      submitData.append("projectDescription", formData.projectDescription);
+      submitData.append("appName", report.metadata?.projectName || formData.appName);
+      submitData.append("shortDescription", report.summary || formData.shortDescription);
       submitData.append("detailedDescription", formData.detailedDescription);
       submitData.append("vettScore", report.score.toString());
       submitData.append("vettGrade", report.grade);
@@ -371,20 +371,30 @@ export function ReportView({
       submitData.append("frameworks", JSON.stringify(extractFrameworks(report)));
       submitData.append("hasTests", String(report.strengths?.some(s => s.toLowerCase().includes("test")) || false));
       submitData.append("hasDocumentation", String(report.strengths?.some(s => s.toLowerCase().includes("documentation")) || false));
-      submitData.append("category", formData.category);
-      submitData.append("subCategory", formData.subCategory);
+      submitData.append("appCategory", formData.appCategory);
+
       submitData.append("tags", formData.tags);
-      submitData.append("regularPrice", formData.regularPrice);
-      submitData.append("salePrice", formData.salePrice);
+      submitData.append("price", formData.price);
+      submitData.append("currency", formData.currency);
       submitData.append("licenseType", formData.licenseType);
-      submitData.append("demoUrl", formData.demoUrl);
+      submitData.append("liveDemo", formData.liveDemo);
       submitData.append("documentationUrl", formData.documentationUrl);
-      submitData.append("videoUrl", formData.videoUrl);
-      submitData.append("features", JSON.stringify(formData.features.filter(f => f.trim())));
+      submitData.append("videoDemo", formData.videoDemo);
+      submitData.append("technologyStack", JSON.stringify(formData.technologyStack.filter(t => t.trim())));
+      submitData.append("isFree", String(formData.isFree));
+      submitData.append("githubRepo", formData.githubRepo);
+      submitData.append("supportedPlatforms", JSON.stringify(formData.supportedPlatforms.filter(p => p.trim())));
+      submitData.append("dependencies", JSON.stringify(formData.dependencies.filter(d => d.trim())));
+      submitData.append("commercialUse", formData.commercialUse);
+      submitData.append("resaleRights", formData.resaleRights);
+      submitData.append("supportLevel", formData.supportLevel);
+      submitData.append("updateFrequency", formData.updateFrequency);
+      submitData.append("warranty", formData.warranty);
+      submitData.append("installationSupport", formData.installationSupport);
       
       // Add images
-      formData.images.forEach((image) => {
-        submitData.append("images", image);
+      formData.screenshots.forEach((image) => {
+        submitData.append("screenshots", image);
       });
 
       // Submit to backend
@@ -405,7 +415,7 @@ export function ReportView({
 
       // Redirect to success page
       const params = new URLSearchParams({
-        projectName: data.data.projectName,
+        appName: data.data.appName,
         vettScore: data.data.vettScore.toString(),
         vettGrade: data.data.vettGrade,
       });
