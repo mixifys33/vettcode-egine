@@ -6,6 +6,24 @@ import { useState, useEffect } from "react";
 import { PreListModal, type PreListFormData } from "./PreListModal";
 import { AutoPreListSettings } from "./AutoPreListSettings";
 import { AuthModal } from "./AuthModal";
+import { getAuthUser, clearAuth } from "@/lib/auth";
+import {
+  TrendingUp,
+  ShieldCheck,
+  Banknote,
+  BellRing,
+  Award,
+  Settings,
+  ArrowRight,
+  Loader2,
+  AlertTriangle,
+  Target,
+  Lightbulb,
+  AlertOctagon,
+  ShieldAlert,
+  Wrench,
+  FileCheck,
+} from "lucide-react";
 
 function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
   const [isOpen, setIsOpen] = useState(level < 2);
@@ -281,44 +299,31 @@ export function ReportView({
   
   // Handle monetize button click - check auth and open modal
   const handleMonetizeClick = () => {
-    // Check if user has valid seller token
-    const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
-    
+    // Read the signed-in user saved by the auth flow (key: vettcode_auth)
+    const user = getAuthUser();
+    const token = user?.token;
+
     if (!token) {
-      // No token - show auth modal instead of redirecting
-      setShowAuthModal(true);
-      return;
-    }
-    
-    // Validate token freshness
-    try {
-      const tokenParts = token.split('_');
-      if (tokenParts.length >= 3) {
-        const timestamp = parseInt(tokenParts[2], 10);
-        const tokenAge = Date.now() - timestamp;
-        const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
-        
-        if (tokenAge > MAX_TOKEN_AGE) {
-          // Token expired - clear and show auth modal
-          console.warn('[Monetize] Token expired, showing login');
-          localStorage.removeItem("sellerToken");
-          localStorage.removeItem("vettcode_seller_token");
-          localStorage.removeItem("seller_token");
-          setShowAuthModal(true);
-          return;
-        }
-      }
-    } catch (error) {
-      console.error('[Monetize] Token validation error:', error);
-      // Invalid token format - show auth modal
-      localStorage.removeItem("sellerToken");
-      localStorage.removeItem("vettcode_seller_token");
-      localStorage.removeItem("seller_token");
+      // Not signed in - show auth modal instead of redirecting
       setShowAuthModal(true);
       return;
     }
 
-    // User is authenticated with fresh token, open pre-list form directly
+    // Validate token freshness (token format: vettcode_<sellerId>_<timestamp>)
+    const tokenParts = token.split('_');
+    if (tokenParts.length >= 3) {
+      const timestamp = parseInt(tokenParts[tokenParts.length - 1], 10);
+      const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+      if (Number.isFinite(timestamp) && Date.now() - timestamp > MAX_TOKEN_AGE) {
+        // Session expired - clear and show auth modal
+        clearAuth();
+        setShowAuthModal(true);
+        return;
+      }
+    }
+
+    // User is authenticated with a fresh session, open pre-list form directly
     setShowPreListModal(true);
   };
   
@@ -334,7 +339,7 @@ export function ReportView({
     setAutoPreListEnabled(enabled);
     if (enabled) {
       // Show success message
-      alert("✅ Auto pre-list enabled! The form will open automatically after each scan (score ≥ 60).");
+      alert("Auto pre-list enabled. The form will open automatically after each scan with a score of 60 or higher.");
     }
   };
 
@@ -344,8 +349,8 @@ export function ReportView({
     setSubmitError("");
 
     try {
-      const token = localStorage.getItem("sellerToken") || localStorage.getItem("vettcode_seller_token") || localStorage.getItem("seller_token");
-      
+      const token = getAuthUser()?.token;
+
       if (!token) {
         throw new Error("Authentication required");
       }
@@ -1367,40 +1372,51 @@ export function ReportView({
             marginBottom: "1rem",
             flexWrap: "wrap"
           }}>
-            <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
-              💰
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "48px",
+              height: "48px",
+              borderRadius: "10px",
+              background: "rgba(34, 211, 165, 0.12)",
+              border: "1px solid rgba(34, 211, 165, 0.35)",
+              flexShrink: 0
+            }}>
+              <TrendingUp size={24} color="var(--accent)" strokeWidth={2} />
             </div>
             <div style={{ flex: 1, minWidth: "200px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
                 <div style={{ flex: 1 }}>
                   <h3 style={{
-                    fontSize: "1.25rem",
+                    fontSize: "1.2rem",
                     fontWeight: 700,
-                    marginBottom: "0.5rem",
-                    background: "linear-gradient(90deg, var(--accent), var(--primary))",
-                    WebkitBackgroundClip: "text",
-                    backgroundClip: "text",
-                    color: "transparent"
+                    marginBottom: "0.4rem",
+                    color: "var(--text)",
+                    letterSpacing: "-0.01em"
                   }}>
-                    Ready to Earn from Your Code?
+                    Monetize this project on VETTCODE
                   </h3>
-                  <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
-                    Your code scored <span style={{ fontWeight: 700, color: "var(--accent)" }}>{report.grade}</span>! 
-                    Pre-list it on VETTCODE and get notified when corporate buyers can purchase it.
+                  <p style={{ fontSize: "0.92rem", color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
+                    Your code earned a grade of <span style={{ fontWeight: 700, color: "var(--accent)" }}>{report.grade}</span>, so it qualifies for the marketplace.
+                    Pre-list it now to reserve your spot and get notified when corporate buyers can purchase.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAutoPreListSettings(true)}
-                  title="Auto Pre-List Settings"
+                  title="Auto pre-list settings"
+                  aria-label="Auto pre-list settings"
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     padding: "0.5rem",
                     background: "rgba(99, 102, 241, 0.1)",
                     border: "1px solid rgba(99, 102, 241, 0.3)",
-                    borderRadius: "6px",
+                    borderRadius: "8px",
                     color: "var(--primary)",
                     cursor: "pointer",
-                    fontSize: "1.2rem",
                     transition: "all 0.2s ease",
                     flexShrink: 0
                   }}
@@ -1413,7 +1429,7 @@ export function ReportView({
                     e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)";
                   }}
                 >
-                  ⚙️
+                  <Settings size={18} />
                 </button>
               </div>
             </div>
@@ -1421,34 +1437,32 @@ export function ReportView({
           
           <div style={{
             background: "rgba(0, 0, 0, 0.2)",
-            borderRadius: "8px",
-            padding: "1rem",
+            borderRadius: "10px",
+            padding: "1.1rem 1.25rem",
             marginBottom: "1rem",
-            border: "1px solid rgba(34, 211, 165, 0.3)"
+            border: "1px solid rgba(34, 211, 165, 0.25)"
           }}>
             <ul style={{ 
               listStyle: "none", 
               padding: 0, 
               margin: 0,
               fontSize: "0.9rem",
-              lineHeight: "1.8"
+              lineHeight: "1.5"
             }}>
               {[
-                { icon: "✓", text: "No public listing yet - your code stays private" },
-                { icon: "💵", text: "Set your own price when the platform launches" },
-                { icon: "📧", text: "Get notified the moment buyers can purchase" },
-                { icon: "🏆", text: "Early pre-listers get priority placement & badges" }
-              ].map((item, idx) => (
+                { Icon: ShieldCheck, text: "No public listing yet — your code stays private" },
+                { Icon: Banknote, text: "Set your own price when the platform launches" },
+                { Icon: BellRing, text: "Get notified the moment buyers can purchase" },
+                { Icon: Award, text: "Early pre-listers get priority placement and badges" }
+              ].map(({ Icon, text }, idx) => (
                 <li key={idx} style={{
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: "0.75rem",
-                  marginBottom: idx < 3 ? "0.5rem" : "0"
+                  marginBottom: idx < 3 ? "0.7rem" : "0"
                 }}>
-                  <span style={{ color: "var(--accent)", fontWeight: "bold", flexShrink: 0 }}>
-                    {item.icon}
-                  </span>
-                  <span style={{ color: "var(--text)" }}>{item.text}</span>
+                  <Icon size={18} color="var(--accent)" strokeWidth={2} style={{ flexShrink: 0 }} />
+                  <span style={{ color: "var(--text)" }}>{text}</span>
                 </li>
               ))}
             </ul>
@@ -1472,9 +1486,12 @@ export function ReportView({
             onClick={handleMonetizeClick}
             disabled={isSubmitting}
             style={{
-              display: "block",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.6rem",
               width: "100%",
-              padding: "1rem 1.5rem",
+              padding: "0.95rem 1.5rem",
               fontSize: "1rem",
               fontWeight: 700,
               textAlign: "center",
@@ -1503,20 +1520,15 @@ export function ReportView({
             }}
           >
             {isSubmitting ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
-                <span style={{ 
-                  display: "inline-block",
-                  width: "16px",
-                  height: "16px",
-                  border: "2px solid #06080d",
-                  borderTopColor: "transparent",
-                  borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite"
-                }} />
-                Pre-Listing Your Code...
-              </span>
+              <>
+                <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} />
+                Pre-listing your code...
+              </>
             ) : (
-              "🚀 Start Earning from Your Code on VETTCODE"
+              <>
+                Pre-list and start earning
+                <ArrowRight size={18} />
+              </>
             )}
           </button>
           
@@ -1559,19 +1571,30 @@ export function ReportView({
             marginBottom: "1rem",
             flexWrap: "wrap"
           }}>
-            <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>
-              ⚠️
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "48px",
+              height: "48px",
+              borderRadius: "10px",
+              background: "rgba(251, 191, 36, 0.12)",
+              border: "1px solid rgba(251, 191, 36, 0.35)",
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={24} color="var(--warning)" strokeWidth={2} />
             </div>
             <div style={{ flex: 1, minWidth: "200px" }}>
               <h3 style={{
-                fontSize: "1.25rem",
+                fontSize: "1.2rem",
                 fontWeight: 700,
-                marginBottom: "0.5rem",
-                color: "var(--warning)"
+                marginBottom: "0.4rem",
+                color: "var(--text)",
+                letterSpacing: "-0.01em"
               }}>
-                You're Missing Out on Earning Potential!
+                Not eligible for the marketplace yet
               </h3>
-              <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
+              <p style={{ fontSize: "0.92rem", color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
                 Your code scored <span style={{ fontWeight: 700, color: "var(--warning)" }}>{report.grade} ({report.score}/100)</span>. 
                 To monetize on VETTCODE, you need a minimum score of <span style={{ fontWeight: 700, color: "var(--accent)" }}>60/100</span>.
               </p>
@@ -1580,48 +1603,53 @@ export function ReportView({
           
           <div style={{
             background: "rgba(0, 0, 0, 0.2)",
-            borderRadius: "8px",
-            padding: "1rem",
+            borderRadius: "10px",
+            padding: "1.1rem 1.25rem",
             marginBottom: "1rem",
-            border: "1px solid rgba(251, 191, 36, 0.3)"
+            border: "1px solid rgba(251, 191, 36, 0.25)"
           }}>
             <p style={{ 
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
               fontSize: "0.9rem", 
               fontWeight: 600, 
-              marginBottom: "0.75rem",
+              marginBottom: "0.85rem",
               color: "var(--text)"
             }}>
-              🎯 How to Reach 60+ Score:
+              <Target size={18} color="var(--warning)" strokeWidth={2} />
+              How to reach a 60+ score
             </p>
             <ul style={{ 
               listStyle: "none", 
               padding: 0, 
               margin: 0,
               fontSize: "0.9rem",
-              lineHeight: "1.8"
+              lineHeight: "1.5"
             }}>
               {[
-                { icon: "🔴", text: `Fix ${report.criticalBlockers.length} critical blocker${report.criticalBlockers.length !== 1 ? 's' : ''} (highest priority!)` },
-                { icon: "🟠", text: "Address high-severity security vulnerabilities" },
-                { icon: "🟡", text: "Improve error handling and input validation" },
-                { icon: "🟢", text: "Add tests and documentation for better quality" }
-              ].map((item, idx) => (
+                { Icon: AlertOctagon, color: "var(--danger)", text: `Fix ${report.criticalBlockers.length} critical blocker${report.criticalBlockers.length !== 1 ? 's' : ''} (highest priority)` },
+                { Icon: ShieldAlert, color: "#f59e0b", text: "Address high-severity security vulnerabilities" },
+                { Icon: Wrench, color: "#eab308", text: "Improve error handling and input validation" },
+                { Icon: FileCheck, color: "var(--accent)", text: "Add tests and documentation for better quality" }
+              ].map(({ Icon, color, text }, idx) => (
                 <li key={idx} style={{
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: "0.75rem",
-                  marginBottom: idx < 3 ? "0.5rem" : "0"
+                  marginBottom: idx < 3 ? "0.7rem" : "0"
                 }}>
-                  <span style={{ flexShrink: 0 }}>
-                    {item.icon}
-                  </span>
-                  <span style={{ color: "var(--text)" }}>{item.text}</span>
+                  <Icon size={18} color={color} strokeWidth={2} style={{ flexShrink: 0 }} />
+                  <span style={{ color: "var(--text)" }}>{text}</span>
                 </li>
               ))}
             </ul>
           </div>
           
           <div style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.6rem",
             padding: "0.75rem 1rem",
             background: "rgba(34, 211, 165, 0.1)",
             border: "1px solid var(--accent)",
@@ -1630,8 +1658,11 @@ export function ReportView({
             color: "var(--text)",
             borderLeft: "3px solid var(--accent)"
           }}>
-            💡 <strong style={{ color: "var(--accent)" }}>Good News:</strong> You're only {60 - report.score} points away! 
-            Fix the issues above, rescan your code, and start earning from VETTCODE.
+            <Lightbulb size={18} color="var(--accent)" strokeWidth={2} style={{ flexShrink: 0, marginTop: "0.1rem" }} />
+            <span>
+              <strong style={{ color: "var(--accent)" }}>You're close:</strong> only {60 - report.score} points away. 
+              Fix the issues above, rescan your code, and start earning from VETTCODE.
+            </span>
           </div>
         </div>
       )}
