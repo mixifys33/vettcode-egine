@@ -36,6 +36,7 @@ export async function collectFromFileList(
   let totalBytes = 0;
 
   const items = Array.from(fileList);
+  console.log(`[collectFromFileList] Total files: ${items.length}`);
 
   for (const file of items) {
     // Use webkitRelativePath for folder uploads to preserve full directory structure
@@ -43,6 +44,8 @@ export async function collectFromFileList(
       (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
       file.name;
     const path = rawPath.replace(/\\/g, "/");
+
+    console.log(`[collectFromFileList] File path: ${path}, webkitRelativePath: ${(file as File & { webkitRelativePath?: string }).webkitRelativePath}`);
 
     if (shouldIgnorePath(path)) {
       ignoredCount++;

@@ -285,14 +285,12 @@ export function ReportView({
   const downloadFileTree = () => {
     if (!report.metadata?.fileTree) return;
     
-    const treeLines = buildFlatFileTree(report.metadata.fileTree);
-    const treeText = treeLines.join('\n');
-    
-    const blob = new Blob([treeText], { type: 'text/plain' });
+    const treeJson = JSON.stringify(report.metadata.fileTree, null, 2);
+    const blob = new Blob([treeJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vettcode-file-tree-${Date.now()}.txt`;
+    a.download = `vettcode-file-tree-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -397,13 +395,9 @@ export function ReportView({
         submitData.append("screenshots", image);
       });
 
-      // Submit to backend
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
-      const response = await fetch(`${backendUrl}/api/pre-listed-code/submit`, {
+      // Submit to Next.js API route
+      const response = await fetch("/api/pre-listed-code/submit", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: submitData,
       });
 

@@ -65,11 +65,13 @@ export default function Home() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [user, setUser] = useState(getAuthUser());
+  const [user, setUser] = useState<typeof getAuthUser extends () => infer T ? T : null>(null);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     setUser(getAuthUser());
     
     // Check if desktop to auto-open sidebar
@@ -173,7 +175,7 @@ export default function Home() {
   return (
     <main className="container">
       {/* Reports History Sidebar */}
-      {isAuthenticated() && (
+      {mounted && isAuthenticated() && (
         <ReportsHistory
           currentReportId={currentReportId}
           onSelectReport={handleSelectReport}
@@ -234,7 +236,7 @@ export default function Home() {
 
           <PrivacyBanner />
 
-          {!isAuthenticated() && scanQuota.remaining != null && (
+          {mounted && !isAuthenticated() && scanQuota.remaining != null && (
             <p className="tier-note">
               Guest scans remaining: {scanQuota.remaining}.{" "}
               <button

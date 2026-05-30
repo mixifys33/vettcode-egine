@@ -712,6 +712,9 @@ function generatePrevention(finding: StaticFinding): string {
 function buildFileTree(files: CodeFile[]): FileTreeNode[] {
   const root: Map<string, FileTreeNode> = new Map();
 
+  console.log(`[buildFileTree] Processing ${files.length} files`);
+  console.log(`[buildFileTree] Sample paths:`, files.slice(0, 5).map(f => f.path));
+
   for (const file of files) {
     const parts = file.path.split("/").filter(Boolean);
     let currentLevel = root;
@@ -750,6 +753,8 @@ function buildFileTree(files: CodeFile[]): FileTreeNode[] {
       }
     }
   }
+
+  console.log(`[buildFileTree] Built tree with ${root.size} root nodes`);
 
   // Convert map to sorted array
   const sortNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {

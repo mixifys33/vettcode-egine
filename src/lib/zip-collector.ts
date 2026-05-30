@@ -22,8 +22,26 @@ function isLikelyBinary(buffer: ArrayBuffer | SharedArrayBuffer): boolean {
 
 function stripArchiveRoot(paths: string[]): (path: string) => string {
   if (paths.length === 0) return (p) => p;
+  
+  // Find the common prefix across all paths
   const first = paths[0].replace(/\\/g, "/");
   const slash = first.indexOf("/");
+  
+  // Only strip if there's a clear single root directory
+  // Check if all paths share the same root
+  const commonPrefix = slash === -1 ? first : first.slice(0, slash);
+  const allSharePrefix = paths.every(p => {
+    const normalized = p.replace(/\\/g, "/");
+    const firstSlash = normalized.indexOf("/");
+    const pathPrefix = firstSlash === -1 ? normalized : normalized.slice(0, firstSlash);
+    return pathPrefix === commonPrefix;
+  });
+  
+  if (!allSharePrefix) {
+    // Paths don't share a common prefix, don't strip anything
+    return (path: string) => path.replace(/\\/g, "/");
+  }
+  
   // Only strip the first directory level (e.g., "owner-repo-hash/" or "project-name/")
   const prefix = slash === -1 ? `${first}/` : `${first.slice(0, slash + 1)}`;
   return (path: string) => {
@@ -51,10 +69,15 @@ export async function collectFromZipBuffer(
   let totalBytes = 0;
 
   const entryNames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+  console.log(`[collectFromZipBuffer] Total entries: ${entryNames.length}`);
+  console.log(`[collectFromZipBuffer] Sample raw paths:`, entryNames.slice(0, 5));
+  
   const normalizePath = stripArchiveRoot(entryNames);
 
   for (const rawPath of entryNames) {
     const path = normalizePath(rawPath);
+    console.log(`[collectFromZipBuffer] Raw path: ${rawPath}, Normalized path: ${path}`);
+    
     if (!path || shouldIgnorePath(path)) {
       ignoredCount++;
       continue;
