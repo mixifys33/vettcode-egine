@@ -108,9 +108,9 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
         ...languages,
         ...frameworks,
         // Add category-based tags based on findings
-        report.findings.some(f => f.category === 'Security') ? 'secure' : '',
-        report.findings.some(f => f.category === 'Performance') ? 'performant' : '',
-        report.findings.some(f => f.category === 'Code Quality') ? 'clean-code' : '',
+        report.findings.some(f => f.category === 'security') ? 'secure' : '',
+        report.findings.some(f => f.category === 'performance') ? 'performant' : '',
+        report.findings.some(f => f.category === 'code-quality') ? 'clean-code' : '',
         report.score >= 80 ? 'production-ready' : '',
       ].filter(Boolean).join(", ");
 
