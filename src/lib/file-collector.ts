@@ -38,6 +38,7 @@ export async function collectFromFileList(
   const items = Array.from(fileList);
 
   for (const file of items) {
+    // Use webkitRelativePath for folder uploads to preserve full directory structure
     const rawPath =
       (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
       file.name;

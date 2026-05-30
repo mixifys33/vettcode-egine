@@ -24,7 +24,6 @@ export const IGNORED_DIR_NAMES = new Set([
   "env",
   ".env",
   "target",
-  "bin",
   "obj",
   ".gradle",
   ".idea",

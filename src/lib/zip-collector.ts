@@ -24,6 +24,7 @@ function stripArchiveRoot(paths: string[]): (path: string) => string {
   if (paths.length === 0) return (p) => p;
   const first = paths[0].replace(/\\/g, "/");
   const slash = first.indexOf("/");
+  // Only strip the first directory level (e.g., "owner-repo-hash/" or "project-name/")
   const prefix = slash === -1 ? `${first}/` : `${first.slice(0, slash + 1)}`;
   return (path: string) => {
     const normalized = path.replace(/\\/g, "/");

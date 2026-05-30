@@ -97,20 +97,67 @@ export function PreListModal({ isOpen, onClose, report, onSubmit }: PreListModal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Auto-fill tags and technology stack from scan
+  // Auto-fill tags and technology stack from scan with enhanced logic
   useEffect(() => {
-    if (isOpen && !formData.tags) {
+    if (isOpen) {
       const languages = extractLanguages(report);
       const frameworks = extractFrameworks(report);
-      const autoTags = [...languages, ...frameworks].join(", ");
+
+      // Generate intelligent tags from scan results
+      const autoTags = [
+        ...languages,
+        ...frameworks,
+        // Add category-based tags based on findings
+        report.findings.some(f => f.category === 'Security') ? 'secure' : '',
+        report.findings.some(f => f.category === 'Performance') ? 'performant' : '',
+        report.findings.some(f => f.category === 'Code Quality') ? 'clean-code' : '',
+        report.score >= 80 ? 'production-ready' : '',
+      ].filter(Boolean).join(", ");
+
       const autoTechStack = [...languages, ...frameworks];
-      setFormData(prev => ({ 
-        ...prev, 
+
+      // Auto-detect app category based on technology stack
+      let detectedCategory = formData.appCategory;
+      if (!detectedCategory) {
+        if (languages.includes('JavaScript') || languages.includes('TypeScript')) {
+          if (frameworks.includes('React') || frameworks.includes('Next.js')) {
+            detectedCategory = 'Web Application';
+          } else if (frameworks.includes('React Native')) {
+            detectedCategory = 'Mobile App (React Native)';
+          } else if (frameworks.includes('Node.js')) {
+            detectedCategory = 'API/Backend Service';
+          }
+        } else if (languages.includes('Python')) {
+          detectedCategory = 'API/Backend Service';
+        } else if (languages.includes('Java') || languages.includes('Kotlin')) {
+          detectedCategory = 'Mobile App (Native Android)';
+        } else if (languages.includes('Swift')) {
+          detectedCategory = 'Mobile App (Native iOS)';
+        }
+      }
+
+      // Auto-detect supported platforms based on technology
+      let detectedPlatforms = formData.supportedPlatforms;
+      if (detectedPlatforms.length === 0) {
+        detectedPlatforms = ['Web']; // Default to web
+        if (frameworks.includes('React Native')) {
+          detectedPlatforms = ['iOS', 'Android'];
+        } else if (languages.includes('Swift')) {
+          detectedPlatforms = ['iOS'];
+        } else if (languages.includes('Java') || languages.includes('Kotlin')) {
+          detectedPlatforms = ['Android'];
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
         tags: autoTags,
-        technologyStack: autoTechStack.length > 0 ? autoTechStack : prev.technologyStack
+        technologyStack: autoTechStack.length > 0 ? autoTechStack : prev.technologyStack,
+        appCategory: detectedCategory || prev.appCategory,
+        supportedPlatforms: detectedPlatforms.length > 0 ? detectedPlatforms : prev.supportedPlatforms,
       }));
     }
-  }, [isOpen, report]);
+  }, [isOpen, report, formData.appCategory, formData.supportedPlatforms]);
 
   const extractLanguages = (report: VettReport): string[] => {
     const languages = new Set<string>();
