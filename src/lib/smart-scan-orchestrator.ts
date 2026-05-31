@@ -428,15 +428,18 @@ export async function runSmartScan(
   // Determine displayed score: if AI improves the score, use average
   let displayedScore: number;
   let scoreSource: "static" | "ai" | "average";
+  let originalScore: number;
   
   if (fullScore > staticOnlyScore) {
     // AI improved the score, use average
     displayedScore = Math.round((fullScore + staticOnlyScore) / 2);
     scoreSource = "average";
+    originalScore = staticOnlyScore;
   } else {
     // AI didn't improve the score, use the lower (more conservative) score
     displayedScore = fullScore;
     scoreSource = fullScore === staticOnlyScore ? "static" : "ai";
+    originalScore = staticOnlyScore;
   }
 
   const grade = scoreToGrade(displayedScore);
@@ -496,6 +499,7 @@ export async function runSmartScan(
       staticOnlyScore,
       fullScore,
       displayedScore,
+      originalScore,
       scoreSource,
       // Scanner results
       scannerResults: {

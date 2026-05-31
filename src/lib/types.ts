@@ -61,6 +61,7 @@ export interface VettReport {
     staticOnlyScore?: number;
     fullScore?: number;
     displayedScore?: number;
+    originalScore?: number;
     scoreSource?: "static" | "ai" | "average";
     // Scanner results
     scannerResults?: {
