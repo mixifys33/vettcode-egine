@@ -6,10 +6,10 @@ import { ScanProgress } from "@/components/ScanProgress";
 import { ReportView } from "@/components/ReportView";
 import { AuthModal } from "@/components/AuthModal";
 import { ReportsHistory } from "@/components/ReportsHistory";
-import { collectFromFileList, collectFromZip } from "@/lib/file-collector";
+import { collectFromFileList, collectFromZip, type CollectResult } from "@/lib/file-collector";
 import { collectFromRemoteUrl } from "@/lib/collect-from-remote";
 import { RepoUrlInput } from "@/components/RepoUrlInput";
-import { runSmartScan, type ScanMode } from "@/lib/smart-scan-orchestrator";
+import { runSmartScan, type ScanMode, type ScannerConfig, defaultScannerConfig } from "@/lib/smart-scan-orchestrator";
 import {
   canScan,
   incrementScanCount,
@@ -55,6 +55,7 @@ function PrivacyBanner() {
 export default function Home() {
   const [projectName, setProjectName] = useState("my-project");
   const [scanMode, setScanMode] = useState<ScanMode>("quick");
+  const [scannerConfig, setScannerConfig] = useState<ScannerConfig>(defaultScannerConfig);
   const [scanning, setScanning] = useState(false);
   const [scanStartedAt, setScanStartedAt] = useState<number | undefined>();
   const [phase, setPhase] = useState("");
@@ -89,11 +90,7 @@ export default function Home() {
   }
 
   async function startScan(
-    collect: () => Promise<{
-      files: import("@/lib/types").CodeFile[];
-      ignoredCount: number;
-      warnings: string[];
-    }>
+    collect: () => Promise<CollectResult>
   ) {
     const scanCheck = canScan();
     if (!scanCheck.allowed) {
@@ -131,6 +128,7 @@ export default function Home() {
           setDetail(d);
         },
         scanMode,
+        defaultScannerConfig,
         result.allFilePaths
       );
 

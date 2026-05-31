@@ -2,6 +2,7 @@
  * Smart Scan Orchestrator
  * Implements the full pipeline:
  * 1. Static Analysis → 2. AST Extraction → 3. AI Analysis → 4. Verification → 5. Report
+ * Plus additional scanners: Security (npm-audit, Snyk), Performance (SonarJS, Clinic.js), Stress (Artillery, Autocannon)
  */
 
 import { runStaticAnalysis, runEnhancedStaticAnalysis, shouldSendToAI, type StaticFinding } from "./static-analyzer";
@@ -9,6 +10,21 @@ import { extractHighRiskCode, shouldAnalyzeFile, type ExtractedCode } from "./as
 import { verifyFindings, deduplicateFindings, calculateReportConfidence, type AIFinding, type VerifiedFinding } from "./verification-layer";
 import { selectFilesForQuickScan } from "./scan-priority";
 import type { CodeFile, VettReport, FileTreeNode } from "./types";
+import {
+  scanWithNpmAudit,
+  scanWithSnyk,
+  scanWithSonarJS,
+  scanWithClinic,
+  scanWithArtillery,
+  scanWithAutocannon,
+  type CombinedScannerResults,
+  type ScannerConfig,
+  defaultScannerConfig,
+} from "./scanners";
+
+// Re-export scanner types for convenience
+export type { ScannerConfig } from "./scanners";
+export { defaultScannerConfig } from "./scanners";
 
 export type ScanMode = "quick" | "deep";
 
@@ -34,12 +50,222 @@ export interface SmartScanResult {
 const PARALLEL_AI_CALLS = 3; // Use all 3 API keys in parallel
 const DEEP_SCAN_PARALLEL = 12; // Deep scan uses 12 parallel workers (4x multiplier)
 
+/**
+ * Run additional scanners in parallel
+ */
+async function runAdditionalScanners(
+  files: CodeFile[],
+  config: ScannerConfig
+): Promise<CombinedScannerResults> {
+  const results: CombinedScannerResults = {};
+  const scannerPromises: Promise<void>[] = [];
+
+  if (config.enableNpmAudit) {
+    scannerPromises.push(
+      scanWithNpmAudit(files).then(result => {
+        results.npmAudit = result;
+      })
+    );
+  }
+
+  if (config.enableSnyk) {
+    scannerPromises.push(
+      scanWithSnyk(files).then(result => {
+        results.snyk = result;
+      })
+    );
+  }
+
+  if (config.enableSonarJS) {
+    scannerPromises.push(
+      scanWithSonarJS(files).then(result => {
+        results.sonarJS = result;
+      })
+    );
+  }
+
+  if (config.enableClinic) {
+    scannerPromises.push(
+      scanWithClinic(files).then(result => {
+        results.clinic = result;
+      })
+    );
+  }
+
+  if (config.enableArtillery) {
+    scannerPromises.push(
+      scanWithArtillery(files).then(result => {
+        results.artillery = result;
+      })
+    );
+  }
+
+  if (config.enableAutocannon) {
+    scannerPromises.push(
+      scanWithAutocannon(files).then(result => {
+        results.autocannon = result;
+      })
+    );
+  }
+
+  await Promise.all(scannerPromises);
+  return results;
+}
+
+/**
+ * Convert scanner results to verified findings format
+ */
+function convertScannerResultsToFindings(scannerResults: CombinedScannerResults): VerifiedFinding[] {
+  const findings: VerifiedFinding[] = [];
+
+  // Convert npm-audit results
+  if (scannerResults.npmAudit) {
+    for (const vuln of scannerResults.npmAudit.vulnerabilities) {
+      findings.push({
+        id: `npm-audit-${vuln.id}`,
+        severity: vuln.severity === "critical" ? "critical" : vuln.severity === "high" ? "high" : vuln.severity === "moderate" ? "medium" : "low",
+        category: "security",
+        title: vuln.title,
+        description: `Known vulnerability in ${vuln.package}@${vuln.version}`,
+        file: "package.json",
+        line: 1,
+        evidence: `Package: ${vuln.package}, Version: ${vuln.version}`,
+        mitigation: vuln.recommendation,
+        prevention: "Regularly update dependencies and run npm audit",
+        confidence: "high",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by npm-audit scanner",
+        sources: ["npm-audit"],
+        source: "scanner",
+      });
+    }
+  }
+
+  // Convert Snyk results
+  if (scannerResults.snyk) {
+    for (const vuln of scannerResults.snyk.vulnerabilities) {
+      findings.push({
+        id: `snyk-${vuln.id}`,
+        severity: vuln.severity === "critical" ? "critical" : vuln.severity === "high" ? "high" : vuln.severity === "medium" ? "medium" : "low",
+        category: "security",
+        title: vuln.title,
+        description: vuln.description,
+        file: vuln.package,
+        line: 1,
+        evidence: `CVSS Score: ${vuln.cvssScore}, CWE: ${vuln.cwe?.join(", ")}`,
+        mitigation: vuln.remediation,
+        prevention: "Regularly update dependencies and run Snyk scans",
+        confidence: "high",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by Snyk scanner",
+        sources: ["snyk"],
+        source: "scanner",
+      });
+    }
+  }
+
+  // Convert SonarJS results
+  if (scannerResults.sonarJS) {
+    for (const issue of scannerResults.sonarJS.issues) {
+      findings.push({
+        id: `sonarjs-${issue.id}`,
+        severity: issue.severity === "blocker" || issue.severity === "critical" ? "critical" : issue.severity === "major" ? "high" : issue.severity === "minor" ? "medium" : "low",
+        category: issue.type === "bug" ? "bug" : issue.type === "vulnerability" ? "security" : "code-quality",
+        title: issue.message,
+        description: `${issue.rule}: ${issue.message}`,
+        file: issue.file,
+        line: issue.line,
+        evidence: `Rule: ${issue.rule}`,
+        mitigation: "Refactor code according to SonarJS recommendations",
+        prevention: "Run SonarJS regularly during development",
+        confidence: "medium",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by SonarJS scanner",
+        sources: ["sonarjs"],
+        source: "scanner",
+      });
+    }
+  }
+
+  // Convert Clinic.js results
+  if (scannerResults.clinic) {
+    for (const issue of scannerResults.clinic.performanceIssues) {
+      findings.push({
+        id: `clinic-${issue.id}`,
+        severity: issue.severity === "high" ? "high" : issue.severity === "medium" ? "medium" : "low",
+        category: "performance",
+        title: issue.message,
+        description: `${issue.type}: ${issue.message}`,
+        file: issue.file,
+        line: issue.line || 1,
+        evidence: `Type: ${issue.type}`,
+        mitigation: issue.recommendation,
+        prevention: "Run Clinic.js performance profiling regularly",
+        confidence: "medium",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by Clinic.js scanner",
+        sources: ["clinic"],
+        source: "scanner",
+      });
+    }
+  }
+
+  // Convert Artillery results
+  if (scannerResults.artillery) {
+    for (const issue of scannerResults.artillery.stressTestIssues) {
+      findings.push({
+        id: `artillery-${issue.id}`,
+        severity: issue.severity === "high" ? "high" : issue.severity === "medium" ? "medium" : "low",
+        category: "performance",
+        title: issue.message,
+        description: `${issue.type}: ${issue.message}`,
+        file: issue.file,
+        line: issue.line || 1,
+        evidence: `Type: ${issue.type}`,
+        mitigation: issue.recommendation,
+        prevention: "Run load testing with Artillery regularly",
+        confidence: "medium",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by Artillery scanner",
+        sources: ["artillery"],
+        source: "scanner",
+      });
+    }
+  }
+
+  // Convert Autocannon results
+  if (scannerResults.autocannon) {
+    for (const issue of scannerResults.autocannon.benchmarkIssues) {
+      findings.push({
+        id: `autocannon-${issue.id}`,
+        severity: issue.severity === "high" ? "high" : issue.severity === "medium" ? "medium" : "low",
+        category: "performance",
+        title: issue.message,
+        description: `${issue.type}: ${issue.message}`,
+        file: issue.file,
+        line: issue.line || 1,
+        evidence: `Type: ${issue.type}`,
+        mitigation: issue.recommendation,
+        prevention: "Run benchmarking with Autocannon regularly",
+        confidence: "medium",
+        verificationStatus: "confirmed",
+        verificationNotes: "Detected by Autocannon scanner",
+        sources: ["autocannon"],
+        source: "scanner",
+      });
+    }
+  }
+
+  return findings;
+}
+
 export async function runSmartScan(
   projectName: string,
   files: CodeFile[],
   ignoredCount: number,
   onProgress: (phase: string, pct: number, detail?: string) => void,
   mode: ScanMode = "quick",
+  scannerConfig: ScannerConfig = defaultScannerConfig, // Configuration for additional scanners
   allFilePaths?: string[] // All file paths (before filtering) for building complete file tree
 ): Promise<SmartScanResult> {
   const aiFiles =
@@ -56,8 +282,19 @@ export async function runSmartScan(
   
   onProgress("Static analysis", 25, `${staticFindings.length} signals flagged`);
 
+  // Phase 1.5: Additional Scanners (Security, Performance, Stress Testing)
+  onProgress("Additional scanners", 28, "Running security, performance, and stress scanners…");
+  
+  let scannerResults: CombinedScannerResults = {};
+  if (scannerConfig.enableNpmAudit || scannerConfig.enableSnyk || 
+      scannerConfig.enableSonarJS || scannerConfig.enableClinic ||
+      scannerConfig.enableArtillery || scannerConfig.enableAutocannon) {
+    scannerResults = await runAdditionalScanners(files, scannerConfig);
+    onProgress("Additional scanners", 30, "Additional scanners complete");
+  }
+
   // Phase 2: AST Extraction (extract only high-risk code sections)
-  onProgress("Code extraction", 30, `Targeting ${staticScopeLabel}…`);
+  onProgress("Code extraction", 35, `Targeting ${staticScopeLabel}…`);
   
   const extractedSections: ExtractedCode[] = [];
   let totalOriginalChars = 0;
@@ -81,7 +318,7 @@ export async function runSmartScan(
 
   onProgress(
     "Code extraction",
-    40,
+    45,
     `${extractedSections.length} high-risk regions · ${tokenReduction}% token reduction`
   );
 
@@ -93,7 +330,7 @@ export async function runSmartScan(
   // Phase 3: AI Analysis (deep reasoning on extracted code)
   onProgress(
     mode === "quick" ? "AI review" : "AI deep review",
-    45,
+    50,
     mode === "quick"
       ? "Reviewing priority surfaces…"
       : "Parallel review across extracted regions…"
@@ -176,7 +413,8 @@ export async function runSmartScan(
   }));
 
   // Merge all findings
-  const allFindings = [...verifiedStaticFindings, ...verificationResult.verified];
+  const scannerFindings = convertScannerResultsToFindings(scannerResults);
+  const allFindings = [...verifiedStaticFindings, ...verificationResult.verified, ...scannerFindings];
   const deduplicated = deduplicateFindings(allFindings);
 
   // Calculate strict score
@@ -233,6 +471,16 @@ export async function runSmartScan(
       staticFindings: deduplicated.filter(f => f.source === "static").length,
       aiFindings: deduplicated.filter(f => f.source === "ai").length,
       verifiedFindings: deduplicated.filter(f => f.source === "verified").length,
+      scannerFindings: deduplicated.filter(f => f.source === "scanner").length,
+      // Scanner results
+      scannerResults: {
+        npmAudit: scannerResults.npmAudit?.summary,
+        snyk: scannerResults.snyk?.summary,
+        sonarJS: scannerResults.sonarJS?.summary,
+        clinic: scannerResults.clinic?.summary,
+        artillery: scannerResults.artillery?.summary,
+        autocannon: scannerResults.autocannon?.summary,
+      },
     },
   };
 
@@ -242,6 +490,7 @@ export async function runSmartScan(
     staticFindings: staticFindings.length,
     aiFindings: aiFindings.length,
     verifiedFindings: deduplicated.length,
+    scannerFindings: scannerFindings.length,
     falsePositives: verificationResult.summary.falsePositives,
     tokensSaved: `${tokenReduction}% (${Math.round((totalOriginalChars - totalExtractedChars) / 1000)}K chars)`,
   };
