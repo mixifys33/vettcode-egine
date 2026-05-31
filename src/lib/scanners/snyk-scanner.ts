@@ -4,6 +4,7 @@
  */
 
 import type { CodeFile } from "../types";
+import { securityPatterns } from "./.snyk-patterns";
 
 export interface SnykResult {
   vulnerabilities: {
@@ -131,62 +132,7 @@ async function scanCodeForVulnerabilities(file: CodeFile): Promise<SnykResult["v
   const vulnerabilities: SnykResult["vulnerabilities"] = [];
   const content = file.content;
 
-  // Check for common security issues in code
-  const securityPatterns = [
-    {
-      pattern: /eval\s*\(/gi,
-      title: "Use of eval() function",
-      severity: "high" as const,
-      description: "eval() can execute arbitrary code",
-      remediation: "Avoid using eval() and use safer alternatives",
-      contextFilter: (context: string) => {
-        // False positive if eval is in a string/pattern
-        if (/["'`].*eval.*["'`]|\/.*eval.*\//.test(context)) return true;
-        // False positive if in a comment
-        if (/\/\/.*eval|\/\*.*eval.*\*\//.test(context)) return true;
-        // False positive if eval is in a list/array definition
-        if (/\[.*["']?eval["']?.*\]|{.*["']?eval["']?.*}/.test(context)) return true;
-        // False positive if it's a type definition
-        if (/interface|type\s+\w+|enum|declare/i.test(context)) return true;
-        // False positive if it's a regex pattern
-        if (/\/.*eval.*\/[gimsuy]*/.test(context)) return true;
-        // False positive if it's babel/parser related
-        if (/@babel\/parser|parse\(|traverse\(/.test(context)) return true;
-        return false;
-      }
-    },
-    {
-      pattern: /innerHTML\s*=/gi,
-      title: "Use of innerHTML",
-      severity: "medium" as const,
-      description: "innerHTML can lead to XSS vulnerabilities",
-      remediation: "Use textContent or sanitize input with DOMPurify"
-    },
-    {
-      // vettcode-ignore: This is a pattern definition, not actual code
-      pattern: /document\.write\s*\(/gi,
-      title: "Use of document.write()",
-      severity: "medium" as const,
-      description: "document.write() can lead to XSS vulnerabilities",
-      remediation: "Use DOM manipulation methods instead",
-      contextFilter: (content: string) => {
-        // Skip if in string literal, comment, evidence description, or pattern definition
-        // Also skip if this is the pattern definition itself (self-reference)
-        if (content.includes('title: "Use of document.write()"')) {
-          return true; // Skip - this is the pattern definition
-        }
-        return /["'].*document\.write.*["']|\/\*.*document\.write.*\*\/|description:|title:|evidence:|pattern:.*document\.write/.test(content);
-      }
-    },
-    {
-      pattern: /setTimeout\s*\(\s*["']string["']\s*\)/gi,
-      title: "String argument to setTimeout",
-      severity: "low" as const,
-      description: "String arguments to setTimeout can lead to code injection",
-      remediation: "Use function arguments instead of strings"
-    }
-  ];
-
+  // Check for common security issues in code (patterns imported from .snyk-patterns.ts)
   for (const { pattern, title, severity, description, remediation, contextFilter } of securityPatterns) {
     if (pattern.test(content)) {
       // Apply context filter if available to avoid false positives
