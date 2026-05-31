@@ -163,6 +163,9 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       
       setGoogleAuthStep("Success! Redirecting...");
       setTimeout(() => {
+        setGoogleAuthInProgress(false);
+        setGoogleAuthStep("");
+        setLoading(false);
         onSuccess();
       }, 500);
     } catch (err) {

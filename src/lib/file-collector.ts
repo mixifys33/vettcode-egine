@@ -124,6 +124,14 @@ export async function collectFromZip(
 
   for (const path of entries) {
     const normalized = path.replace(/\\/g, "/");
+    
+    // Path traversal protection: reject paths with .. or leading /
+    if (normalized.includes("..") || normalized.startsWith("/")) {
+      warnings.push(`Blocked potential path traversal: ${normalized}`);
+      ignoredCount++;
+      continue;
+    }
+    
     if (shouldIgnorePath(normalized)) {
       ignoredCount++;
       continue;

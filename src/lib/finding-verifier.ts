@@ -120,9 +120,10 @@ export function verifyFinding(
   }
 
   // If it's in a test file, downgrade severity
+  let adjustedSeverity = finding.severity;
   if (finding.file.includes(".test.") || finding.file.includes(".spec.")) {
-    if (finding.severity === "critical") finding.severity = "high";
-    if (finding.severity === "high") finding.severity = "medium";
+    if (adjustedSeverity === "critical") adjustedSeverity = "high";
+    if (adjustedSeverity === "high") adjustedSeverity = "medium";
     verificationNotes = (verificationNotes || "") + " Found in test file.";
   }
 
@@ -133,6 +134,7 @@ export function verifyFinding(
 
   return {
     ...finding,
+    severity: adjustedSeverity,
     verified,
     verificationNotes,
     originalConfidence: finding.confidence,

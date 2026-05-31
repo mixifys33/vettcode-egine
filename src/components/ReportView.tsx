@@ -149,7 +149,7 @@ function FindingItem({ f, isExpanded, onToggle }: { f: Finding; isExpanded: bool
           {f.evidence && (
             <div className="finding-section">
               <strong>Evidence</strong>
-              <pre className="evidence">{f.evidence}</pre>
+              <pre className="evidence">{DOMPurify.sanitize(f.evidence, { ALLOWED_TAGS: [] })}</pre>
             </div>
           )}
           <div className="finding-section">
@@ -317,7 +317,8 @@ export function ReportView({
       const timestamp = parseInt(tokenParts[tokenParts.length - 1], 10);
       const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-      if (Number.isFinite(timestamp) && Date.now() - timestamp > MAX_TOKEN_AGE) {
+      // Check that timestamp is not in the future and not too old
+      if (Number.isFinite(timestamp) && timestamp <= Date.now() && Date.now() - timestamp > MAX_TOKEN_AGE) {
         // Session expired - clear and show auth modal
         clearAuth();
         setShowAuthModal(true);
