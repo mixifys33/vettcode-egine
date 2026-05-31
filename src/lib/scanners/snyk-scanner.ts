@@ -163,14 +163,19 @@ async function scanCodeForVulnerabilities(file: CodeFile): Promise<SnykResult["v
       remediation: "Use textContent or sanitize input with DOMPurify"
     },
     {
+      // vettcode-ignore: This is a pattern definition, not actual code
       pattern: /document\.write\s*\(/gi,
       title: "Use of document.write()",
       severity: "medium" as const,
       description: "document.write() can lead to XSS vulnerabilities",
       remediation: "Use DOM manipulation methods instead",
       contextFilter: (content: string) => {
-        // Skip if in string literal, comment, or evidence description
-        return /["'].*document\.write.*["']|\/\*.*document\.write.*\*\/|description:|title:|evidence:/.test(content);
+        // Skip if in string literal, comment, evidence description, or pattern definition
+        // Also skip if this is the pattern definition itself (self-reference)
+        if (content.includes('title: "Use of document.write()"')) {
+          return true; // Skip - this is the pattern definition
+        }
+        return /["'].*document\.write.*["']|\/\*.*document\.write.*\*\/|description:|title:|evidence:|pattern:.*document\.write/.test(content);
       }
     },
     {
