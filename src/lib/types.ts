@@ -57,6 +57,11 @@ export interface VettReport {
     aiFindings?: number;
     verifiedFindings?: number;
     scannerFindings?: number;
+    // Score breakdown
+    staticOnlyScore?: number;
+    fullScore?: number;
+    displayedScore?: number;
+    scoreSource?: "static" | "ai" | "average";
     // Scanner results
     scannerResults?: {
       npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
