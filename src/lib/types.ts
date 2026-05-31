@@ -62,9 +62,9 @@ export interface VettReport {
       npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
       snyk?: { total: number; low: number; medium: number; high: number; critical: number };
       sonarJS?: { total: number; bugs: number; vulnerabilities: number; codeSmells: number; securityHotspots: number; blocker: number; critical: number; major: number; minor: number; info: number };
-      clinic?: { summary: string };
-      artillery?: { summary: string };
-      autocannon?: { summary: string };
+      clinic?: { total: number; memoryLeaks: number; eventLoopLag: number; cpuUsage: number; ioBlocking: number; asyncWaterfall: number };
+      artillery?: { total: number; high: number; medium: number; low: number };
+      autocannon?: { total: number; high: number; medium: number; low: number };
     };
   };
   // Legacy fields for backward compatibility
