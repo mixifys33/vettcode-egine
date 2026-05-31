@@ -24,8 +24,8 @@ export interface VerifiedFinding extends AIFinding {
   confidence: "high" | "medium" | "low";
   verificationStatus: "confirmed" | "likely" | "uncertain" | "false-positive";
   verificationNotes: string;
-  sources: ("static-analysis" | "ai-analysis" | "pattern-match")[];
-  source?: "static" | "ai" | "verified"; // Track origin for reporting
+  sources: ("static-analysis" | "ai-analysis" | "pattern-match" | "npm-audit" | "snyk" | "sonarjs" | "clinic" | "artillery" | "autocannon")[];
+  source?: "static" | "ai" | "verified" | "scanner"; // Track origin for reporting
 }
 
 export interface VerificationResult {
