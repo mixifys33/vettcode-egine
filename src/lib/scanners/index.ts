@@ -3,12 +3,21 @@
  * Exports all scanner modules for easy integration
  */
 
-export { scanWithNpmAudit, type NpmAuditResult } from "./npm-audit-scanner";
-export { scanWithSnyk, type SnykResult } from "./snyk-scanner";
-export { scanWithSonarJS, type SonarJSResult } from "./sonarjs-scanner";
-export { scanWithClinic, type ClinicResult } from "./clinic-scanner";
-export { scanWithArtillery, type ArtilleryResult } from "./artillery-scanner";
-export { scanWithAutocannon, type AutocannonResult } from "./autocannon-scanner";
+import { type NpmAuditResult } from "./npm-audit-scanner";
+import { type SnykResult } from "./snyk-scanner";
+import { type SonarJSResult } from "./sonarjs-scanner";
+import { type ClinicResult } from "./clinic-scanner";
+import { type ArtilleryResult } from "./artillery-scanner";
+import { type AutocannonResult } from "./autocannon-scanner";
+
+export { scanWithNpmAudit } from "./npm-audit-scanner";
+export { scanWithSnyk } from "./snyk-scanner";
+export { scanWithSonarJS } from "./sonarjs-scanner";
+export { scanWithClinic } from "./clinic-scanner";
+export { scanWithArtillery } from "./artillery-scanner";
+export { scanWithAutocannon } from "./autocannon-scanner";
+
+export type { NpmAuditResult, SnykResult, SonarJSResult, ClinicResult, ArtilleryResult, AutocannonResult };
 
 export interface ScannerConfig {
   enableNpmAudit: boolean;
