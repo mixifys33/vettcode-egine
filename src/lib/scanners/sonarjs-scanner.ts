@@ -1,6 +1,7 @@
 /**
  * SonarJS Scanner
- * Deep static analysis to detect bugs, vulnerabilities, and code smells
+ * Real integration with ESLint + SonarJS plugin for deep static analysis
+ * Detects bugs, vulnerabilities, and code smells using actual SonarJS rules
  * All findings are labeled as suggestions for code quality improvements
  */
 
@@ -31,14 +32,24 @@ export interface SonarJSResult {
 export async function scanWithSonarJS(files: CodeFile[]): Promise<SonarJSResult> {
   const issues: SonarJSResult["issues"] = [];
 
-  // Filter JavaScript/TypeScript files
-  const codeFiles = files.filter(
-    (f) => f.path.match(/\.(js|ts|jsx|tsx)$/) && !f.path.includes("node_modules")
-  );
+  // Check if we're in a server environment (Node.js)
+  const isServer = typeof window === "undefined";
 
-  for (const file of codeFiles) {
-    const fileIssues = await analyzeFile(file);
-    issues.push(...fileIssues);
+  if (isServer) {
+    // Use real ESLint with SonarJS plugin on server-side
+    try {
+      const eslintResults = await runESLintWithSonarJS(files);
+      issues.push(...eslintResults);
+    } catch (error: any) {
+      console.error("Failed to run ESLint with SonarJS:", error.message);
+      // Fall back to simplified analysis
+      const fallbackResults = await runSimplifiedAnalysis(files);
+      issues.push(...fallbackResults);
+    }
+  } else {
+    // Client-side: use simplified analysis
+    const fallbackResults = await runSimplifiedAnalysis(files);
+    issues.push(...fallbackResults);
   }
 
   const summary = {
@@ -53,10 +64,117 @@ export async function scanWithSonarJS(files: CodeFile[]): Promise<SonarJSResult>
   return { issues, summary };
 }
 
+async function runESLintWithSonarJS(files: CodeFile[]): Promise<SonarJSResult["issues"]> {
+  const issues: SonarJSResult["issues"] = [];
+
+  // Filter JavaScript/TypeScript files
+  const codeFiles = files.filter(
+    (f) => f.path.match(/\.(js|ts|jsx|tsx)$/) && !f.path.includes("node_modules")
+  );
+
+  try {
+    // Dynamic imports for Node.js modules
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const { writeFileSync, existsSync, mkdirSync } = await import("fs");
+    const { join } = await import("path");
+    const { tmpdir } = await import("os");
+
+    const execAsync = promisify(exec);
+
+    // Create temporary directory for files
+    const tempDir = join(tmpdir(), `sonarjs-scan-${Date.now()}`);
+
+    // Create directory structure
+    for (const file of codeFiles) {
+      const filePath = join(tempDir, file.path);
+      const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
+      if (dirPath && !existsSync(dirPath)) {
+        mkdirSync(dirPath, { recursive: true });
+      }
+      // Write file content
+      writeFileSync(filePath, file.content, "utf-8");
+    }
+
+    // Run ESLint with SonarJS plugin
+    const { stdout, stderr } = await execAsync(
+      `npx eslint "${tempDir}/**/*.{js,ts,jsx,tsx}" --format json --config .eslintrc.json`,
+      {
+        cwd: process.cwd(),
+        timeout: 60000,
+        maxBuffer: 10 * 1024 * 1024,
+      }
+    );
+
+    // Parse ESLint JSON output
+    const eslintOutput = JSON.parse(stdout);
+    for (const result of eslintOutput) {
+      for (const message of result.messages) {
+        const issue = eslintMessageToSonarJSIssue(result.filePath, message);
+        if (issue) {
+          issues.push(issue);
+        }
+      }
+    }
+  } catch (error: any) {
+    // ESLint might not be installed or SonarJS plugin not available
+    console.error("ESLint with SonarJS failed, falling back to simplified analysis:", error.message);
+    throw error;
+  }
+
+  return issues;
+}
+
+function eslintMessageToSonarJSIssue(
+  filePath: string,
+  message: any
+): SonarJSResult["issues"][0] | null {
+  // Map ESLint rule IDs to SonarJS rule types
+  const ruleId = message.ruleId || "unknown";
+
+  let type: "bug" | "vulnerability" | "code_smell" | "security_hotspot" = "code_smell";
+
+  if (ruleId.includes("security") || ruleId.includes("xss") || ruleId.includes("injection")) {
+    type = "security_hotspot";
+  } else if (ruleId.includes("vulnerability")) {
+    type = "vulnerability";
+  } else if (ruleId.includes("bug") || ruleId.includes("error")) {
+    type = "bug";
+  }
+
+  return {
+    id: `${ruleId}-${filePath}-${message.line}`,
+    rule: ruleId,
+    severity: "suggestion",
+    type,
+    message: message.message,
+    file: filePath,
+    line: message.line || 1,
+    column: message.column,
+    effort: "5min",
+  };
+}
+
+async function runSimplifiedAnalysis(files: CodeFile[]): Promise<SonarJSResult["issues"]> {
+  const issues: SonarJSResult["issues"] = [];
+
+  // Filter JavaScript/TypeScript files
+  const codeFiles = files.filter(
+    (f) => f.path.match(/\.(js|ts|jsx|tsx)$/) && !f.path.includes("node_modules")
+  );
+
+  for (const file of codeFiles) {
+    const fileIssues = await analyzeFile(file);
+    issues.push(...fileIssues);
+  }
+
+  return issues;
+}
+
 async function analyzeFile(file: CodeFile): Promise<SonarJSResult["issues"]> {
   const issues: SonarJSResult["issues"] = [];
 
-  // SonarJS rules (simplified implementation)
+  // SonarJS rules (simplified implementation for fallback)
   const rules = [
     {
       id: "sonarjs:S930",
