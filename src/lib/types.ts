@@ -61,7 +61,7 @@ export interface VettReport {
     scannerResults?: {
       npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
       snyk?: { total: number; low: number; medium: number; high: number; critical: number };
-      sonarJS?: { total: number; low: number; medium: number; high: number; critical: number };
+      sonarJS?: { total: number; bugs: number; vulnerabilities: number; codeSmells: number; securityHotspots: number; blocker: number; critical: number; major: number; minor: number; info: number };
       clinic?: { summary: string };
       artillery?: { summary: string };
       autocannon?: { summary: string };
