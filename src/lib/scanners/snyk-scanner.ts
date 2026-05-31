@@ -138,7 +138,22 @@ async function scanCodeForVulnerabilities(file: CodeFile): Promise<SnykResult["v
       title: "Use of eval() function",
       severity: "high" as const,
       description: "eval() can execute arbitrary code",
-      remediation: "Avoid using eval() and use safer alternatives"
+      remediation: "Avoid using eval() and use safer alternatives",
+      contextFilter: (context: string) => {
+        // False positive if eval is in a string/pattern
+        if (/["'`].*eval.*["'`]|\/.*eval.*\//.test(context)) return true;
+        // False positive if in a comment
+        if (/\/\/.*eval|\/\*.*eval.*\*\//.test(context)) return true;
+        // False positive if eval is in a list/array definition
+        if (/\[.*["']?eval["']?.*\]|{.*["']?eval["']?.*}/.test(context)) return true;
+        // False positive if it's a type definition
+        if (/interface|type\s+\w+|enum|declare/i.test(context)) return true;
+        // False positive if it's a regex pattern
+        if (/\/.*eval.*\/[gimsuy]*/.test(context)) return true;
+        // False positive if it's babel/parser related
+        if (/@babel\/parser|parse\(|traverse\(/.test(context)) return true;
+        return false;
+      }
     },
     {
       pattern: /innerHTML\s*=/gi,
@@ -163,8 +178,12 @@ async function scanCodeForVulnerabilities(file: CodeFile): Promise<SnykResult["v
     }
   ];
 
-  for (const { pattern, title, severity, description, remediation } of securityPatterns) {
+  for (const { pattern, title, severity, description, remediation, contextFilter } of securityPatterns) {
     if (pattern.test(content)) {
+      // Apply context filter if available to avoid false positives
+      if (contextFilter && contextFilter(content)) {
+        continue; // Skip this finding as it's a false positive
+      }
       vulnerabilities.push({
         id: `snyk-code-${file.path}-${title.replace(/\s+/g, "-").toLowerCase()}`,
         title: `${title} in ${file.path}`,

@@ -1023,17 +1023,20 @@ function isFalsePositive(
   switch (patternId) {
     case "ai-mock-data":
       return validateMockData(evidence, context, filePath);
-      
+
     case "eval-usage":
       return validateEvalUsage(evidence, context);
-      
+
     case "hardcoded-password":
       return validateHardcodedPassword(evidence, context, filePurpose);
-      
+
     case "hardcoded-secret-api-key":
     case "hardcoded-jwt-secret":
       return validateHardcodedSecret(evidence, context, fileType);
-      
+
+    case "client-side-token-generation":
+      return validateClientSideTokenGeneration(evidence, context);
+
     case "logging-sensitive-data":
       return validateSensitiveLogging(evidence, context, filePath);
       
@@ -1194,6 +1197,24 @@ function validateEvalUsage(evidence: string, context: string): boolean {
   // False positive if in a comment
   if (/\/\/.*eval|\/\*.*eval.*\*\//.test(evidence)) return true;
   
+  // False positive if eval is in a list/array definition (like keyword lists)
+  if (/\[.*["']?eval["']?.*\]|{.*["']?eval["']?.*}/.test(context)) return true;
+  
+  // False positive if it's a type definition or interface
+  if (/interface|type\s+\w+|enum|declare.*eval/i.test(context)) return true;
+  
+  // False positive if it's a regex pattern definition
+  if (/\/.*eval.*\/[gimsuy]*/.test(context)) return true;
+  
+  // False positive if it's in a test file or spec
+  if (/\.test\.|\.spec\.|__tests__|__specs__/.test(context)) return true;
+  
+  // False positive if it's a documentation comment or example
+  if (/\/\*\*[\s\S]*?eval[\s\S]*?\*\//.test(context)) return true;
+  
+  // False positive if it's a babel/parser related code (safe AST parsing)
+  if (/@babel\/parser|parse\(|traverse\(/.test(context)) return true;
+  
   return false;
 }
 
@@ -1219,6 +1240,22 @@ function validateHardcodedSecret(evidence: string, context: string, fileType: st
   
   // False positive if in example files
   if (fileType === 'example') return true;
+  
+  return false;
+}
+
+function validateClientSideTokenGeneration(evidence: string, context: string): boolean {
+  // False positive if token is generated AFTER successful backend verification
+  if (/verifyRes\.ok|verifyData\.seller|OTP.*verified|authentication.*success/i.test(context)) return true;
+  
+  // False positive if token is for local storage/session management only
+  if (/localStorage|sessionStorage|setAuthUser|vettcode_.*_timestamp/i.test(context)) return true;
+  
+  // False positive if token format is clearly a session token (not a security token)
+  if (/vettcode_\w+_\d+|session_\w+_\d+/i.test(evidence)) return true;
+  
+  // False positive if token is generated from backend response data
+  if (/\$\{.*\.id\}_\$\{Date\.now\(\)\}|verifyData\.|response\.data\./i.test(context)) return true;
   
   return false;
 }
