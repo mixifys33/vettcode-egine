@@ -81,6 +81,7 @@ async function runESLintWithSonarJS(files: CodeFile[]): Promise<SonarJSResult["i
     const { tmpdir } = await import("os");
 
     const execAsync = promisify(exec);
+    const writeFileAsync = promisify(writeFile);
 
     // Create temporary directory for files
     const tempDir = join(tmpdir(), `sonarjs-scan-${Date.now()}`);
@@ -93,7 +94,7 @@ async function runESLintWithSonarJS(files: CodeFile[]): Promise<SonarJSResult["i
         mkdirSync(dirPath, { recursive: true });
       }
       // Write file content asynchronously
-      await writeFile(filePath, file.content, "utf-8");
+      await writeFileAsync(filePath, file.content, "utf-8");
     }
 
     // Run ESLint with SonarJS plugin
