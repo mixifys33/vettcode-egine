@@ -998,7 +998,7 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
         if (!folderNode.children) {
           folderNode.children = [];
         }
-        // Create a map for the next level
+        // Create a map for the next level from the folder's children
         const childMap = new Map<string, FileTreeNode>();
         for (const child of folderNode.children) {
           childMap.set(child.name, child);
@@ -1008,8 +1008,49 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
     }
   }
 
-  console.log(`[buildFileTreeFromPaths] Built tree with ${root.size} root nodes`);
-  console.log(`[buildFileTreeFromPaths] Root nodes:`, Array.from(root.values()).map(n => ({ name: n.name, type: n.type, childrenCount: n.children?.length || 0 })));
+  // Rebuild the tree structure from the maps
+  // The issue is that we need to ensure children arrays are properly populated
+  const rebuildTree = (nodeMap: Map<string, FileTreeNode>): FileTreeNode[] => {
+    const nodes = Array.from(nodeMap.values());
+    for (const node of nodes) {
+      if (node.type === "folder" && node.children) {
+        // The children array should already be populated from the map
+        // But we need to ensure it's properly structured
+        if (node.children.length === 0) {
+          // Try to find children from the path structure
+          const childPaths = paths.filter(p => p.startsWith(node.path + "/"));
+          if (childPaths.length > 0) {
+            // This folder should have children
+            // Extract immediate children
+            const immediateChildren = new Set<string>();
+            for (const childPath of childPaths) {
+              const relativePath = childPath.substring(node.path.length + 1);
+              const firstPart = relativePath.split("/")[0];
+              immediateChildren.add(firstPart);
+            }
+            
+            // Create child nodes
+            node.children = Array.from(immediateChildren).map(childName => {
+              const childPath = `${node.path}/${childName}`;
+              const isFile = !paths.some(p => p.startsWith(childPath + "/"));
+              return {
+                name: childName,
+                type: isFile ? "file" : "folder",
+                path: childPath,
+                children: isFile ? undefined : [],
+              };
+            });
+          }
+        }
+      }
+    }
+    return nodes;
+  };
+
+  const treeNodes = rebuildTree(root);
+
+  console.log(`[buildFileTreeFromPaths] Built tree with ${treeNodes.length} root nodes`);
+  console.log(`[buildFileTreeFromPaths] Root nodes:`, treeNodes.map(n => ({ name: n.name, type: n.type, childrenCount: n.children?.length || 0 })));
 
   // Convert map to sorted array
   const sortNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {
@@ -1027,5 +1068,5 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
     });
   };
 
-  return sortNodes(Array.from(root.values()));
+  return sortNodes(treeNodes);
 }
