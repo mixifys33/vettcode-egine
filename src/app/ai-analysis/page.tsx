@@ -32,7 +32,7 @@ function sanitizeText(text: string): string {
     .replace(/\//g, '&#x2F;');
 }
 
-function AIAnalysisContent(): JSX.Element {
+function AIAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [report, setReport] = useState<VettReport | null>(null);
