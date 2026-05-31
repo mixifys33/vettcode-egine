@@ -7,12 +7,7 @@
   "extends": [
     "eslint:recommended"
   ],
-  "parser": "@babel/eslint-parser",
   "parserOptions": {
-    "requireConfigFile": false,
-    "babelOptions": {
-      "presets": ["@babel/preset-react"]
-    },
     "ecmaVersion": "latest",
     "sourceType": "module",
     "ecmaFeatures": {
@@ -46,5 +41,12 @@
     "sonarjs/prefer-object-literal": "warn",
     "sonarjs/prefer-single-boolean-return": "warn",
     "sonarjs/prefer-while": "warn"
-  }
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "build/",
+    "dist/"
+  ]
 }
