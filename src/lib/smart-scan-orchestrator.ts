@@ -170,7 +170,7 @@ function convertScannerResultsToFindings(scannerResults: CombinedScannerResults)
       findings.push({
         id: `sonarjs-${issue.id}`,
         severity: issue.severity === "blocker" || issue.severity === "critical" ? "critical" : issue.severity === "major" ? "high" : issue.severity === "minor" ? "medium" : "low",
-        category: issue.type === "bug" ? "bug" : issue.type === "vulnerability" ? "security" : "code-quality",
+        category: issue.type === "bug" ? "logic" : issue.type === "vulnerability" ? "security" : "code-quality",
         title: issue.message,
         description: `${issue.rule}: ${issue.message}`,
         file: issue.file,
