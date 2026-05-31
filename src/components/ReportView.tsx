@@ -102,10 +102,10 @@ function FindingItem({ f, isExpanded, onToggle }: { f: Finding; isExpanded: bool
             padding: "0.2rem 0.5rem",
             borderRadius: "999px",
             fontWeight: 600,
-            background: f.source === "verified" ? "var(--accent)" : f.source === "ai" ? "#8b5cf6" : "var(--muted)",
+            background: f.source === "verified" ? "var(--accent)" : f.source === "ai" ? "#8b5cf6" : f.source === "scanner" ? "#f59e0b" : "var(--muted)",
             color: f.source === "static" ? "var(--text)" : "#fff"
           }}>
-            {f.source === "verified" ? "✓ VERIFIED" : f.source === "ai" ? "🤖 AI" : "STATIC"}
+            {f.source === "verified" ? "✓ VERIFIED" : f.source === "ai" ? "🤖 AI" : f.source === "scanner" ? "🔍 SCANNER" : "STATIC"}
           </span>
         )}
         {f.file && (
