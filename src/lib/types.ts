@@ -24,7 +24,7 @@ export interface Finding {
   evidence?: string;
   mitigation: string;
   prevention: string;
-  source?: "static" | "ai" | "verified"; // Track where finding came from
+  source?: "static" | "ai" | "verified" | "scanner"; // Track where finding came from
 }
 
 export interface BatchAnalysisResult {
