@@ -60,7 +60,7 @@ export interface VettReport {
     // Scanner results
     scannerResults?: {
       npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
-      snyk?: { total: number; low: number; moderate: number; high: number; critical: number };
+      snyk?: { total: number; low: number; medium: number; high: number; critical: number };
       sonarJS?: { total: number; low: number; medium: number; high: number; critical: number };
       clinic?: { summary: string };
       artillery?: { summary: string };
