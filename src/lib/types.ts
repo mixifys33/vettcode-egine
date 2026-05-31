@@ -56,6 +56,16 @@ export interface VettReport {
     staticFindings?: number;
     aiFindings?: number;
     verifiedFindings?: number;
+    scannerFindings?: number;
+    // Scanner results
+    scannerResults?: {
+      npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
+      snyk?: { total: number; low: number; moderate: number; high: number; critical: number };
+      sonarJS?: { total: number; low: number; medium: number; high: number; critical: number };
+      clinic?: { summary: string };
+      artillery?: { summary: string };
+      autocannon?: { summary: string };
+    };
   };
   // Legacy fields for backward compatibility
   scannedFiles?: number;
