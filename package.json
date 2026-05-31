@@ -31,7 +31,7 @@
     "clinic": "^13.0.0",
     "autocannon": "^7.15.0",
     "artillery": "^2.0.0",
-    "eslint": "^9.0.0",
+    "eslint": "^8.57.0",
     "eslint-plugin-sonarjs": "^0.25.0"
   },
   "devDependencies": {
