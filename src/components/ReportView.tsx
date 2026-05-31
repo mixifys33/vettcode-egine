@@ -317,8 +317,7 @@ export function ReportView({
       const timestamp = parseInt(tokenParts[tokenParts.length - 1], 10);
       const MAX_TOKEN_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-      // Check that timestamp is not in the future and not too old
-      if (Number.isFinite(timestamp) && timestamp <= Date.now() && Date.now() - timestamp > MAX_TOKEN_AGE) {
+      if (Number.isFinite(timestamp) && Date.now() - timestamp > MAX_TOKEN_AGE) {
         // Session expired - clear and show auth modal
         clearAuth();
         setShowAuthModal(true);

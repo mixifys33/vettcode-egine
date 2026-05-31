@@ -136,22 +136,26 @@ export function parseRepoUrl(input: string): ParsedRemoteRepo | null {
     const host = normalizeHost(url.hostname);
     const hostname = url.hostname.replace(/^www\./, "");
 
-    // Only allow known public Git hosting providers (exact match or subdomain)
+    // Only allow known public Git hosting providers
     const allowedHosts = ['github.com', 'gitlab.com', 'bitbucket.org'];
     const isAllowedHost = allowedHosts.some(allowed => 
       hostname === allowed || hostname.endsWith(`.${allowed}`)
     );
     
-    if (!isAllowedHost) {
-      console.warn(`[SSRF Protection] Blocked non-allowed Git hosting URL: ${hostname}`);
+    // Also allow self-hosted GitLab/Bitbucket instances (but still block private IPs)
+    const isGitHost = hostname.includes('gitlab') || hostname.includes('bitbucket');
+    
+    if (!isAllowedHost && !isGitHost) {
+      console.warn(`[SSRF Protection] Blocked non-Git hosting URL: ${hostname}`);
       return null;
     }
 
     if (hostname === "github.com") return parseGitHubPath(host, url);
-    if (hostname === "gitlab.com") return parseGitLabPath(host, url);
-    if (hostname === "bitbucket.org") return parseBitbucketPath(host, url);
-    if (hostname.endsWith(".gitlab.com")) return parseGitLabPath(host, url);
-    if (hostname.endsWith(".bitbucket.org")) return parseBitbucketPath(host, url);
+    if (hostname === "gitlab.com" || hostname.includes("gitlab"))
+      return parseGitLabPath(host, url);
+    if (hostname === "bitbucket.org" || hostname.includes("bitbucket"))
+      return parseBitbucketPath(host, url);
+    if (url.pathname.includes("/-/")) return parseGitLabPath(host, url);
 
     return null;
   } catch {
