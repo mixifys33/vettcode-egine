@@ -169,7 +169,7 @@ function convertScannerResultsToFindings(scannerResults: CombinedScannerResults)
     for (const issue of scannerResults.sonarJS.issues) {
       findings.push({
         id: `sonarjs-${issue.id}`,
-        severity: issue.severity === "blocker" || issue.severity === "critical" ? "critical" : issue.severity === "major" ? "high" : issue.severity === "minor" ? "medium" : "low",
+        severity: issue.severity === "suggestion" ? "low" : issue.severity === "blocker" || issue.severity === "critical" ? "critical" : issue.severity === "major" ? "high" : issue.severity === "minor" ? "medium" : "low",
         category: issue.type === "bug" ? "logic" : issue.type === "vulnerability" ? "security" : "code-quality",
         title: issue.message,
         description: `${issue.rule}: ${issue.message}`,

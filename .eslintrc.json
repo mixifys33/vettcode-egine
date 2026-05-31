@@ -41,12 +41,5 @@
     "sonarjs/prefer-object-literal": "warn",
     "sonarjs/prefer-single-boolean-return": "warn",
     "sonarjs/prefer-while": "warn"
-  },
-  "parser": "@babel/eslint-parser",
-  "parserOptions": {
-    "requireConfigFile": false,
-    "babelOptions": {
-      "presets": ["@babel/preset-react"]
-    }
   }
 }
