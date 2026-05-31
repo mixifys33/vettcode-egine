@@ -108,7 +108,7 @@ async function runAdditionalScanners(
     );
   }
 
-  await Promise.all(scannerPromises);
+  await Promise.allSettled(scannerPromises);
   return results;
 }
 

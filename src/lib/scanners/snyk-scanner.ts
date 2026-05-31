@@ -167,7 +167,11 @@ async function scanCodeForVulnerabilities(file: CodeFile): Promise<SnykResult["v
       title: "Use of document.write()",
       severity: "medium" as const,
       description: "document.write() can lead to XSS vulnerabilities",
-      remediation: "Use DOM manipulation methods instead"
+      remediation: "Use DOM manipulation methods instead",
+      contextFilter: (content: string) => {
+        // Skip if in string literal, comment, or evidence description
+        return /["'].*document\.write.*["']|\/\*.*document\.write.*\*\/|description:|title:|evidence:/.test(content);
+      }
     },
     {
       pattern: /setTimeout\s*\(\s*["']string["']\s*\)/gi,
