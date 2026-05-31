@@ -16,9 +16,11 @@ export interface SavedReport {
 
 const REPORTS_STORAGE_KEY = "vettcode_saved_reports";
 const MAX_REPORTS = 50; // Limit to prevent localStorage overflow
+const STORAGE_VERSION_KEY = "vettcode_storage_version";
 
-// Simple mutex for localStorage operations to prevent race conditions
+// Improved mutex with version tracking for better race condition prevention
 let reportStorageMutex = Promise.resolve();
+let currentStorageVersion = 0;
 
 /**
  * Get all saved reports for the current user
@@ -34,16 +36,47 @@ export function getSavedReports(): SavedReport[] {
     if (!stored) return [];
     
     const reports = JSON.parse(stored) as SavedReport[];
+    
+    // Validate the parsed result is an array
+    if (!Array.isArray(reports)) {
+      console.error("Invalid reports data: expected array, got", typeof reports);
+      return [];
+    }
+    
+    // Validate each report has required fields
+    const validReports = reports.filter(r => 
+      r && 
+      typeof r === 'object' &&
+      typeof r.id === 'string' &&
+      typeof r.projectName === 'string' &&
+      r.report &&
+      typeof r.savedAt === 'string'
+    );
+    
+    if (validReports.length !== reports.length) {
+      console.warn(`Filtered out ${reports.length - validReports.length} invalid reports`);
+    }
+    
     // Sort by most recent first
-    return reports.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+    return validReports.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
   } catch (error) {
-    console.error("Error loading saved reports:", error);
+    if (error instanceof SyntaxError) {
+      console.error("JSON parse error in saved reports data:", error);
+      // Clear corrupted data
+      try {
+        localStorage.removeItem(`${REPORTS_STORAGE_KEY}_${user.id}`);
+      } catch (clearError) {
+        console.error("Failed to clear corrupted reports:", clearError);
+      }
+    } else {
+      console.error("Error loading saved reports:", error);
+    }
     return [];
   }
 }
 
 /**
- * Save a new report with mutex to prevent race conditions
+ * Save a new report with improved mutex and version tracking to prevent race conditions
  */
 export async function saveReport(
   projectName: string,
@@ -66,9 +99,16 @@ export async function saveReport(
   // Wait for any previous storage operation to complete
   await reportStorageMutex;
   
-  // Create a new mutex for this operation
+  // Create a new mutex for this operation with version tracking
+  const operationVersion = ++currentStorageVersion;
   reportStorageMutex = (async () => {
     try {
+      // Check if this operation is still the latest one
+      if (operationVersion !== currentStorageVersion) {
+        console.warn(`Storage operation ${operationVersion} superseded by ${currentStorageVersion}`);
+        return;
+      }
+      
       const existingReports = getSavedReports();
       
       // Add new report at the beginning
@@ -77,10 +117,17 @@ export async function saveReport(
       // Limit to MAX_REPORTS
       const limitedReports = updatedReports.slice(0, MAX_REPORTS);
       
+      // Update storage version atomically
+      const newVersion = Date.now();
+      localStorage.setItem(`${STORAGE_VERSION_KEY}_${user.id}`, newVersion.toString());
+      
       localStorage.setItem(
         `${REPORTS_STORAGE_KEY}_${user.id}`,
         JSON.stringify(limitedReports)
       );
+    } catch (error) {
+      console.error("Error saving report:", error);
+      throw error;
     } finally {
       // Release the mutex
       reportStorageMutex = Promise.resolve();
