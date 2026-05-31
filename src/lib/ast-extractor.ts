@@ -223,8 +223,12 @@ function calculateRiskScore(code: string): { score: number; factors: string[] } 
     score += 1;
   }
   if (tryCount === 0 && RISK_INDICATORS.async.some(p => code.includes(p))) {
-    factors.push("missing-error-handling");
-    score += 2;
+    // Check if try-catch actually surrounds async operations, not just in comments/strings
+    const hasAsyncInTry = /try\s*\{[\s\S]*?(?:await|async|Promise)/.test(code);
+    if (!hasAsyncInTry && RISK_INDICATORS.async.some(p => code.includes(p))) {
+      factors.push("missing-error-handling");
+      score += 2;
+    }
   }
 
   return { score, factors };
@@ -414,14 +418,19 @@ function extractWithPatterns(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     for (const pattern of functionPatterns) {
+      // Reset lastIndex for global regex to prevent skipping matches
+      pattern.lastIndex = 0;
       const match = pattern.exec(line);
       if (match) {
         // Extract function body (next 30 lines or until next function)
         let endLine = Math.min(i + 30, lines.length);
         for (let j = i + 1; j < lines.length && j < i + 50; j++) {
-          if (functionPatterns.some(p => p.test(lines[j]))) {
+          if (functionPatterns.some(p => {
+            p.lastIndex = 0;
+            return p.test(lines[j]);
+          })) {
             endLine = j;
             break;
           }

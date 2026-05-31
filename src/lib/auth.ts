@@ -58,21 +58,22 @@ export function getScanCount(): number {
 // Increment scan count with mutex to prevent race conditions
 export async function incrementScanCount(): Promise<void> {
   if (typeof window === 'undefined') return;
-  
+
   // Wait for any previous increment operation to complete
   await scanCountMutex;
-  
+
   // Create a new mutex for this operation
   scanCountMutex = (async () => {
     try {
       const current = getScanCount();
-      localStorage.setItem(SCAN_COUNT_KEY, (current + 1).toString());
+      const newValue = current + 1;
+      localStorage.setItem(SCAN_COUNT_KEY, newValue.toString());
     } finally {
       // Release the mutex
       scanCountMutex = Promise.resolve();
     }
   })();
-  
+
   await scanCountMutex;
 }
 

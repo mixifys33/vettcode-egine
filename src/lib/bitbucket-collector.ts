@@ -6,6 +6,7 @@ function headers(): Record<string, string> {
   const h: Record<string, string> = {};
   const token = process.env.BITBUCKET_TOKEN?.trim();
   if (token) {
+    // Avoid logging the token to prevent exposure in error messages
     h.Authorization = token.includes(":")
       ? `Basic ${Buffer.from(token).toString("base64")}`
       : `Bearer ${token}`;

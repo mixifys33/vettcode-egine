@@ -4,6 +4,24 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { VettReport } from "@/lib/types";
 
+// Named constants for magic numbers
+const SEVERITY_DEDUCTIONS = {
+  critical: 15,
+  high: 10,
+  medium: 5,
+  low: 2,
+  info: 1,
+} as const;
+
+const STYLES = {
+  PADDING: "2rem",
+  MAX_WIDTH: "500px",
+  FONT_SIZE_HEADING: "1.5rem",
+  FONT_SIZE_BODY: "0.9rem",
+  MARGIN_BOTTOM_HEADING: "1rem",
+  MARGIN_BOTTOM_BODY: "2rem",
+} as const;
+
 // Sanitize text to prevent XSS
 function sanitizeText(text: string): string {
   return text
@@ -14,7 +32,7 @@ function sanitizeText(text: string): string {
     .replace(/\//g, '&#x2F;');
 }
 
-function AIAnalysisContent() {
+function AIAnalysisContent(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [report, setReport] = useState<VettReport | null>(null);
@@ -29,9 +47,12 @@ function AIAnalysisContent() {
         setReport(parsedReport);
       } catch (error) {
         console.error("Failed to parse report:", error);
+      } finally {
+        setLoading(false);
       }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   if (loading) {
@@ -61,17 +82,17 @@ function AIAnalysisContent() {
 
   if (!report) {
     return (
-      <div style={{ 
-        minHeight: "100vh", 
-        display: "flex", 
-        alignItems: "center", 
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
         justifyContent: "center",
         background: "var(--bg)",
-        padding: "2rem"
+        padding: STYLES.PADDING
       }}>
-        <div style={{ textAlign: "center", maxWidth: "500px" }}>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: 600 }}>No Report Available</h1>
-          <p style={{ color: "var(--muted)", marginBottom: "2rem", fontSize: "0.9rem" }}>
+        <div style={{ textAlign: "center", maxWidth: STYLES.MAX_WIDTH }}>
+          <h1 style={{ fontSize: STYLES.FONT_SIZE_HEADING, marginBottom: STYLES.MARGIN_BOTTOM_HEADING, fontWeight: 600 }}>No Report Available</h1>
+          <p style={{ color: "var(--muted)", marginBottom: STYLES.MARGIN_BOTTOM_BODY, fontSize: STYLES.FONT_SIZE_BODY }}>
             Run a security scan to generate AI analysis data.
           </p>
           <button
@@ -98,19 +119,19 @@ function AIAnalysisContent() {
     aiFindings.forEach(finding => {
       switch (finding.severity) {
         case "critical":
-          deductions += 15;
+          deductions += SEVERITY_DEDUCTIONS.critical;
           break;
         case "high":
-          deductions += 10;
+          deductions += SEVERITY_DEDUCTIONS.high;
           break;
         case "medium":
-          deductions += 5;
+          deductions += SEVERITY_DEDUCTIONS.medium;
           break;
         case "low":
-          deductions += 2;
+          deductions += SEVERITY_DEDUCTIONS.low;
           break;
         case "info":
-          deductions += 1;
+          deductions += SEVERITY_DEDUCTIONS.info;
           break;
       }
     });
