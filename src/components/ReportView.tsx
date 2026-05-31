@@ -503,6 +503,23 @@ export function ReportView({
           </span>
           <span className="score-grade">{report.grade}</span>
         </div>
+        {report.metadata?.staticOnlyScore !== undefined && report.metadata?.scoreSource === "average" && (
+          <div style={{
+            marginTop: "0.5rem",
+            padding: "0.4rem 0.8rem",
+            background: "var(--bg-secondary)",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            color: "var(--muted)",
+            textAlign: "center",
+          }}>
+            Original static score: <strong>{report.metadata.staticOnlyScore}</strong>
+            <br />
+            <span style={{ fontSize: "0.7rem" }}>
+              (AI improved score, displaying average)
+            </span>
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 220 }}>
           <p className="report-title">Vetting report</p>
           <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>

@@ -417,12 +417,32 @@ export async function runSmartScan(
   const allFindings = [...verifiedStaticFindings, ...verificationResult.verified, ...scannerFindings];
   const deduplicated = deduplicateFindings(allFindings);
 
-  // Calculate strict score
-  const score = calculateStrictScore(deduplicated);
-  const grade = scoreToGrade(score);
+  // Calculate static-only score (without AI findings)
+  const staticOnlyFindings = [...verifiedStaticFindings, ...scannerFindings];
+  const staticOnlyDeduplicated = deduplicateFindings(staticOnlyFindings);
+  const staticOnlyScore = calculateStrictScore(staticOnlyDeduplicated);
+
+  // Calculate full score with AI findings
+  const fullScore = calculateStrictScore(deduplicated);
+
+  // Determine displayed score: if AI improves the score, use average
+  let displayedScore: number;
+  let scoreSource: "static" | "ai" | "average";
+  
+  if (fullScore > staticOnlyScore) {
+    // AI improved the score, use average
+    displayedScore = Math.round((fullScore + staticOnlyScore) / 2);
+    scoreSource = "average";
+  } else {
+    // AI didn't improve the score, use the lower (more conservative) score
+    displayedScore = fullScore;
+    scoreSource = fullScore === staticOnlyScore ? "static" : "ai";
+  }
+
+  const grade = scoreToGrade(displayedScore);
 
   // Generate executive verdict
-  const executiveVerdict = generateExecutiveVerdict(deduplicated, score);
+  const executiveVerdict = generateExecutiveVerdict(deduplicated, displayedScore);
 
   // Identify critical blockers
   const criticalBlockers = deduplicated
@@ -438,7 +458,7 @@ export async function runSmartScan(
   onProgress("Complete", 100, "Scan complete");
 
   const report: VettReport = {
-    score,
+    score: displayedScore,
     grade,
     summary: `Analyzed ${files.length} files (${files.reduce((s, f) => s + f.lines, 0)} lines). Found ${deduplicated.length} verified issues.`,
     executiveVerdict,
@@ -472,6 +492,11 @@ export async function runSmartScan(
       aiFindings: deduplicated.filter(f => f.source === "ai").length,
       verifiedFindings: deduplicated.filter(f => f.source === "verified").length,
       scannerFindings: deduplicated.filter(f => f.source === "scanner").length,
+      // Score breakdown
+      staticOnlyScore,
+      fullScore,
+      displayedScore,
+      scoreSource,
       // Scanner results
       scannerResults: {
         npmAudit: scannerResults.npmAudit?.summary,
