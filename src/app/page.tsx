@@ -19,6 +19,11 @@ import {
 } from "@/lib/auth";
 import { saveReport, type SavedReport } from "@/lib/report-storage";
 import type { VettReport } from "@/lib/types";
+import { 
+  generateScanId, 
+  saveScanAnalytics, 
+  type ScanAnalytics 
+} from "@/lib/scan-analytics";
 
 // Sanitize project name to prevent potential issues
 function sanitizeProjectName(name: string): string {
@@ -134,6 +139,12 @@ export default function Home() {
 
       setReport(scanResult.report);
 
+      // Calculate scan duration
+      const scanDurationMs = Date.now() - (scanStartedAt || Date.now());
+
+      // Log analytics (non-blocking)
+      logScanAnalytics(scanResult.report, scanMode, scanDurationMs, true);
+
       // Save report for authenticated users
       if (isAuthenticated()) {
         try {
@@ -146,10 +157,97 @@ export default function Home() {
         await incrementScanCount();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Scan failed");
+      // Calculate scan duration for failed scans
+      const scanDurationMs = Date.now() - (scanStartedAt || Date.now());
+      const errorMessage = e instanceof Error ? e.message : "Scan failed";
+      
+      // Log failed scan analytics (non-blocking)
+      logScanAnalytics(null, scanMode, scanDurationMs, false, errorMessage);
+      
+      setError(errorMessage);
     } finally {
       setScanning(false);
       setScanStartedAt(undefined);
+    }
+  }
+
+  // Helper function to log scan analytics
+  async function logScanAnalytics(
+    report: VettReport | null,
+    mode: ScanMode,
+    duration: number,
+    success: boolean,
+    errorMessage?: string
+  ) {
+    try {
+      const user = getAuthUser();
+      
+      // Determine scanners used (you can customize this based on your config)
+      const scannersUsed = ['static'];
+      if (success && report) {
+        scannersUsed.push('ai');
+        // Add more scanners based on scannerConfig if needed
+        if (scannerConfig.enableNpmAudit) scannersUsed.push('npm-audit');
+        if (scannerConfig.enableSnyk) scannersUsed.push('snyk');
+        if (scannerConfig.enableSonarJS) scannersUsed.push('sonarjs');
+      }
+
+      const analytics: ScanAnalytics = {
+        id: generateScanId(),
+        timestamp: new Date().toISOString(),
+        
+        // User info
+        userId: user?.id || null,
+        userEmail: user?.email || null,
+        userName: user?.name || null,
+        isAuthenticated: user !== null,
+        
+        // Scan details
+        projectName: report?.metadata.projectName || projectName,
+        scanMode: mode,
+        
+        // Results
+        score: report?.score || 0,
+        grade: report?.grade || 'F',
+        filesScanned: report?.metadata.filesScanned || 0,
+        linesScanned: report?.metadata.linesScanned || 0,
+        
+        // Findings
+        criticalFindings: report?.findings.filter(f => f.severity === 'critical').length || 0,
+        highFindings: report?.findings.filter(f => f.severity === 'high').length || 0,
+        mediumFindings: report?.findings.filter(f => f.severity === 'medium').length || 0,
+        lowFindings: report?.findings.filter(f => f.severity === 'low').length || 0,
+        infoFindings: report?.findings.filter(f => f.severity === 'info').length || 0,
+        totalFindings: report?.findings.length || 0,
+        
+        // Performance
+        scanDurationMs: duration,
+        tokensSaved: 'N/A',
+        
+        // Configuration
+        scannersUsed,
+        
+        // Status
+        success,
+        errorMessage,
+      };
+
+      // Save to localStorage
+      saveScanAnalytics(analytics);
+
+      // Send to backend API (fire and forget - don't block on this)
+      fetch('/api/analytics/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analytics),
+      }).catch(error => {
+        console.warn('[Analytics] Failed to send to backend:', error);
+        // Don't throw - analytics is saved locally anyway
+      });
+
+    } catch (error) {
+      console.error('[Analytics] Failed to log scan:', error);
+      // Don't throw - analytics is not critical to the scan flow
     }
   }
 
