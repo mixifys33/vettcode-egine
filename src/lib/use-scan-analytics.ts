@@ -27,11 +27,11 @@ export function useScanAnalytics() {
       const user = getAuthUser();
       
       // Count findings by severity
-      const criticalFindings = report.findings.filter(f => f.severity === 'critical').length;
-      const highFindings = report.findings.filter(f => f.severity === 'high').length;
-      const mediumFindings = report.findings.filter(f => f.severity === 'medium').length;
-      const lowFindings = report.findings.filter(f => f.severity === 'low').length;
-      const infoFindings = report.findings.filter(f => f.severity === 'info').length;
+      const criticalFindings = report.findings?.filter(f => f.severity === 'critical').length || 0;
+      const highFindings = report.findings?.filter(f => f.severity === 'high').length || 0;
+      const mediumFindings = report.findings?.filter(f => f.severity === 'medium').length || 0;
+      const lowFindings = report.findings?.filter(f => f.severity === 'low').length || 0;
+      const infoFindings = report.findings?.filter(f => f.severity === 'info').length || 0;
       
       const analytics: ScanAnalytics = {
         id: generateScanId(),
@@ -44,14 +44,14 @@ export function useScanAnalytics() {
         isAuthenticated: user !== null,
         
         // Scan details
-        projectName: report.metadata.projectName,
+        projectName: report.metadata?.projectName || 'unknown-project',
         scanMode,
         
         // Results
-        score: report.score,
-        grade: report.grade,
-        filesScanned: report.metadata.filesScanned,
-        linesScanned: report.metadata.linesScanned,
+        score: report.score || 0,
+        grade: report.grade || 'F',
+        filesScanned: report.metadata?.filesScanned || 0,
+        linesScanned: report.metadata?.linesScanned || 0,
         
         // Findings
         criticalFindings,
@@ -59,7 +59,7 @@ export function useScanAnalytics() {
         mediumFindings,
         lowFindings,
         infoFindings,
-        totalFindings: report.findings.length,
+        totalFindings: report.findings?.length || 0,
         
         // Performance
         scanDurationMs,
