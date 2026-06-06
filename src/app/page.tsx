@@ -203,22 +203,22 @@ export default function Home() {
         isAuthenticated: user !== null,
         
         // Scan details
-        projectName: report?.metadata.projectName || projectName,
+        projectName: report?.metadata?.projectName || projectName,
         scanMode: mode,
         
         // Results
         score: report?.score || 0,
         grade: report?.grade || 'F',
-        filesScanned: report?.metadata.filesScanned || 0,
-        linesScanned: report?.metadata.linesScanned || 0,
+        filesScanned: report?.metadata?.filesScanned || 0,
+        linesScanned: report?.metadata?.linesScanned || 0,
         
         // Findings
-        criticalFindings: report?.findings.filter(f => f.severity === 'critical').length || 0,
-        highFindings: report?.findings.filter(f => f.severity === 'high').length || 0,
-        mediumFindings: report?.findings.filter(f => f.severity === 'medium').length || 0,
-        lowFindings: report?.findings.filter(f => f.severity === 'low').length || 0,
-        infoFindings: report?.findings.filter(f => f.severity === 'info').length || 0,
-        totalFindings: report?.findings.length || 0,
+        criticalFindings: report?.findings?.filter(f => f.severity === 'critical').length || 0,
+        highFindings: report?.findings?.filter(f => f.severity === 'high').length || 0,
+        mediumFindings: report?.findings?.filter(f => f.severity === 'medium').length || 0,
+        lowFindings: report?.findings?.filter(f => f.severity === 'low').length || 0,
+        infoFindings: report?.findings?.filter(f => f.severity === 'info').length || 0,
+        totalFindings: report?.findings?.length || 0,
         
         // Performance
         scanDurationMs: duration,
