@@ -405,6 +405,7 @@ function validateByCategory(
         // Check if it's a read-only or small table
         if (/\.findMany\(\)\s*\.length\s*<\s*\d+|LIMIT\s+\d+/i.test(context)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "low",
             reason: "Query appears to be limited, may not need index",
           };
@@ -443,6 +444,7 @@ function validateByCategory(
         // Common constants (0, 1, -1, 100, 1000) are often acceptable
         if (/\b(?:0|1|-1|100|1000)\b/.test(finding.evidence) && !/\*\s*(?:0|1|-1|100|1000)|(?:0|1|-1|100|1000)\s*\*/.test(context)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "low",
             reason: "Common constant, review if it should be extracted",
           };
@@ -454,6 +456,7 @@ function validateByCategory(
         // Check if it's debug logging wrapped in condition
         if (/if\s*\([^)]*(?:debug|dev|development)[^)]*\)/i.test(fullContext)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "low",
             reason: "Conditional debug logging, may be intentional",
           };
@@ -472,6 +475,7 @@ function validateByCategory(
         // TODOs in test files are less critical
         if (finding.file.includes("test") || finding.file.includes("spec") || finding.file.includes("__tests__")) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "low",
             reason: "TODO in test file, lower priority",
           };
@@ -492,6 +496,7 @@ function validateByCategory(
         // Check if it's mapping a static array
         if (/\[(["'][^"']+["'],?\s*){1,5}\]\.map/i.test(fullContext)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "low",
             reason: "Static array with few items, key may not be critical",
           };
@@ -503,6 +508,7 @@ function validateByCategory(
         // Check if dependency is explicitly omitted with eslint-disable
         if (/eslint-disable|eslint-disable-next-line/.test(context)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "medium",
             reason: "Dependency intentionally omitted with ESLint disable",
           };
@@ -536,6 +542,7 @@ function validateByCategory(
         // Check if any is intentional with comment
         if (/\/\/\s*@ts-ignore|\/\*.*any.*\*\/|eslint-disable/i.test(context)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "medium",
             reason: "Type explicitly ignored or documented",
           };
