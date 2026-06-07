@@ -323,6 +323,7 @@ function validateByCategory(
         // Check for malicious pattern detection
         if (/__proto__|constructor.*prototype|<script|javascript:|on\w+=/i.test(fullContext)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "high",
             reason: "Code checks for malicious patterns, but verify completeness",
           };
