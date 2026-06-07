@@ -524,7 +524,7 @@ export function ReportView({
               📊 Score Breakdown
             </div>
             
-            {/* Static Analysis Score */}
+            {/* Static Analysis Score (without AI) */}
             {report.metadata.staticOnlyScore !== undefined && (
               <div style={{ 
                 display: "flex", 
@@ -539,7 +539,7 @@ export function ReportView({
               </div>
             )}
             
-            {/* AI Analysis Score */}
+            {/* Full Score (with AI verification) */}
             {report.metadata.fullScore !== undefined && (
               <div style={{ 
                 display: "flex", 
@@ -547,7 +547,7 @@ export function ReportView({
                 marginBottom: "0.3rem",
                 color: "var(--muted)",
               }}>
-                <span>AI Analysis:</span>
+                <span>With AI Verification:</span>
                 <strong style={{ color: "var(--text)" }}>
                   {report.metadata.fullScore}/100
                 </strong>

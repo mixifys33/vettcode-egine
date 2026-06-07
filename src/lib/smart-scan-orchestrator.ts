@@ -431,22 +431,27 @@ export async function runSmartScan(
   let originalScore: number;
   let scoreExplanation: string;
   
+  // Debug: Log the scores to understand what's happening
+  console.log(`[Score Calculation] Static-only: ${staticOnlyScore}, Full (with AI): ${fullScore}`);
+  
   if (fullScore > staticOnlyScore) {
-    // AI improved the score, use average for fairness
+    // AI improved the score (fewer total issues after verification)
     displayedScore = Math.round((fullScore + staticOnlyScore) / 2);
     scoreSource = "average";
     originalScore = staticOnlyScore;
-    scoreExplanation = `AI analysis found fewer issues than static analysis. For transparency: Static analysis score: ${staticOnlyScore}/100, AI analysis score: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as the final score.`;
-  } else {
-    // AI didn't improve the score, use the lower (more conservative) score
+    scoreExplanation = `AI verification improved the score by filtering false positives. Static analysis: ${staticOnlyScore}/100, AI-verified: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as final score.`;
+  } else if (fullScore < staticOnlyScore) {
+    // AI found additional issues (lower score after AI analysis)
     displayedScore = fullScore;
-    scoreSource = fullScore === staticOnlyScore ? "static" : "ai";
+    scoreSource = "ai";
     originalScore = staticOnlyScore;
-    if (fullScore === staticOnlyScore) {
-      scoreExplanation = `Static and AI analysis are in agreement. Score: ${displayedScore}/100.`;
-    } else {
-      scoreExplanation = `AI analysis found more issues than static analysis. Using conservative AI score: ${displayedScore}/100. (Static analysis: ${staticOnlyScore}/100)`;
-    }
+    scoreExplanation = `AI analysis discovered additional issues beyond static analysis. Using comprehensive AI score: ${displayedScore}/100. (Static-only: ${staticOnlyScore}/100)`;
+  } else {
+    // Scores are equal - both analyses agree
+    displayedScore = fullScore;
+    scoreSource = "static";
+    originalScore = staticOnlyScore;
+    scoreExplanation = `Static and AI analysis are in complete agreement. Final score: ${displayedScore}/100.`;
   }
 
   const grade = scoreToGrade(displayedScore);
