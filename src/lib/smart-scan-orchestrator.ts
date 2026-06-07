@@ -425,21 +425,28 @@ export async function runSmartScan(
   // Calculate full score with AI findings
   const fullScore = calculateStrictScore(deduplicated);
 
-  // Determine displayed score: if AI improves the score, use average
+  // Determine displayed score with transparency
   let displayedScore: number;
   let scoreSource: "static" | "ai" | "average";
   let originalScore: number;
+  let scoreExplanation: string;
   
   if (fullScore > staticOnlyScore) {
-    // AI improved the score, use average
+    // AI improved the score, use average for fairness
     displayedScore = Math.round((fullScore + staticOnlyScore) / 2);
     scoreSource = "average";
     originalScore = staticOnlyScore;
+    scoreExplanation = `AI analysis found fewer issues than static analysis. For transparency: Static analysis score: ${staticOnlyScore}/100, AI analysis score: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as the final score.`;
   } else {
     // AI didn't improve the score, use the lower (more conservative) score
     displayedScore = fullScore;
     scoreSource = fullScore === staticOnlyScore ? "static" : "ai";
     originalScore = staticOnlyScore;
+    if (fullScore === staticOnlyScore) {
+      scoreExplanation = `Static and AI analysis are in agreement. Score: ${displayedScore}/100.`;
+    } else {
+      scoreExplanation = `AI analysis found more issues than static analysis. Using conservative AI score: ${displayedScore}/100. (Static analysis: ${staticOnlyScore}/100)`;
+    }
   }
 
   const grade = scoreToGrade(displayedScore);
@@ -501,6 +508,7 @@ export async function runSmartScan(
       displayedScore,
       originalScore,
       scoreSource,
+      scoreExplanation, // Transparency about scoring logic
       // Scanner results
       scannerResults: {
         npmAudit: scannerResults.npmAudit?.summary,

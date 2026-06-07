@@ -63,7 +63,7 @@ export interface VettReport {
     displayedScore?: number;
     originalScore?: number;
     scoreSource?: "static" | "ai" | "average";
-    // Scanner results
+    scoreExplanation?: string; // Transparency message about scoring    // Scanner results
     scannerResults?: {
       npmAudit?: { total: number; low: number; moderate: number; high: number; critical: number };
       snyk?: { total: number; low: number; medium: number; high: number; critical: number };
