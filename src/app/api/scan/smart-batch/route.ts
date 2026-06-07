@@ -110,31 +110,31 @@ BE SPECIFIC:
 EXAMPLES OF FALSE POSITIVES TO AVOID:
 
 ❌ BAD: "Missing Authentication Check in Smart Batch API"
-   Evidence: `const authHeader = req.headers.get('authorization');`
+   Evidence: const authHeader = req.headers.get('authorization');
    Why wrong: Code IS checking authorization header
 
 ✅ GOOD: Only report if NO auth check exists at all
 
 ❌ BAD: "API Keys Exposed in Environment Variables"
-   Evidence: `const apiKeys = getApiKeys();`
+   Evidence: const apiKeys = getApiKeys();
    Why wrong: Loading from env is the CORRECT approach
 
-✅ GOOD: Only report hardcoded keys like `const key = "sk_live_abc123"`
+✅ GOOD: Only report hardcoded keys like const key = "sk_live_abc123"
 
 ❌ BAD: "AI-Generated Placeholder Code"
-   Evidence: `const result = await chatCompletion(...);`
+   Evidence: const result = await chatCompletion(...);
    Why wrong: This is actual implementation with await and logic
 
-✅ GOOD: Only report if code is literally `// TODO: implement this`
+✅ GOOD: Only report if code is literally // TODO: implement this
 
 ❌ BAD: "Rate Limit Bypass"
-   Evidence: `if (keyLock.get(key)?.lockedUntil > Date.now())`
+   Evidence: if (keyLock.get(key)?.lockedUntil > Date.now())
    Why wrong: This IS rate limiting implementation
 
 ✅ GOOD: Only report if NO rate limiting exists at all
 
 ❌ BAD: "Race Condition in Report Storage"
-   Evidence: `await queue.add(() => writeFile(...))`
+   Evidence: await queue.add(() => writeFile(...))
    Why wrong: Queue IS the race condition protection
 
 ✅ GOOD: Only report if concurrent writes have NO synchronization
