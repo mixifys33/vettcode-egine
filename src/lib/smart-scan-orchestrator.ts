@@ -434,18 +434,19 @@ export async function runSmartScan(
   // Debug: Log the scores to understand what's happening
   console.log(`[Score Calculation] Static-only: ${staticOnlyScore}, Full (with AI): ${fullScore}`);
   
-  if (fullScore > staticOnlyScore) {
-    // AI improved the score (fewer total issues after verification)
+  if (fullScore !== staticOnlyScore) {
+    // Scores differ - ALWAYS use average for fairness
     displayedScore = Math.round((fullScore + staticOnlyScore) / 2);
     scoreSource = "average";
     originalScore = staticOnlyScore;
-    scoreExplanation = `AI verification improved the score by filtering false positives. Static analysis: ${staticOnlyScore}/100, AI-verified: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as final score.`;
-  } else if (fullScore < staticOnlyScore) {
-    // AI found additional issues (lower score after AI analysis)
-    displayedScore = fullScore;
-    scoreSource = "ai";
-    originalScore = staticOnlyScore;
-    scoreExplanation = `AI analysis discovered additional issues beyond static analysis. Using comprehensive AI score: ${displayedScore}/100. (Static-only: ${staticOnlyScore}/100)`;
+    
+    if (fullScore > staticOnlyScore) {
+      // AI improved the score by filtering false positives
+      scoreExplanation = `AI verification improved the score by filtering false positives. Static analysis: ${staticOnlyScore}/100, AI-verified: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as final score.`;
+    } else {
+      // AI found additional real issues
+      scoreExplanation = `AI analysis discovered additional issues beyond static analysis. For fairness: Static analysis: ${staticOnlyScore}/100, AI-verified: ${fullScore}/100. Using balanced average: ${displayedScore}/100 as final score.`;
+    }
   } else {
     // Scores are equal - both analyses agree
     displayedScore = fullScore;
