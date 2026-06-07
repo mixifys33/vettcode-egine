@@ -187,31 +187,28 @@ interface SmartBatch {
 
 export async function POST(req: NextRequest) {
   try {
-    // Authentication check - require valid authorization header
+    // Optional authentication check - validate token if provided, but allow requests without token
+    // This is a security scanner tool that needs to work without user authentication
     const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Unauthorized: Missing or invalid authentication" },
-        { status: 401 }
-      );
-    }
+    if (authHeader) {
+      // If auth header is provided, validate it
+      if (!authHeader.startsWith('Bearer ')) {
+        return NextResponse.json(
+          { error: "Unauthorized: Invalid authentication format" },
+          { status: 401 }
+        );
+      }
 
-    // Validate the token
-    const token = authHeader.substring(7).trim();
-    if (!token || token.length < 32) {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid token format" },
-        { status: 401 }
-      );
+      // Validate the token format if provided
+      const token = authHeader.substring(7).trim();
+      if (token.length < 32 || !/^[a-zA-Z0-9-_]+$/.test(token)) {
+        return NextResponse.json(
+          { error: "Unauthorized: Invalid token format" },
+          { status: 401 }
+        );
+      }
     }
-    
-    // Verify token matches expected format (alphanumeric + hyphens)
-    if (!/^[a-zA-Z0-9-_]+$/.test(token)) {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid token characters" },
-        { status: 401 }
-      );
-    }
+    // If no auth header, continue without authentication (scanner tool mode)
 
     const apiKeys = getApiKeys();
     // Don't log sensitive information about API keys
