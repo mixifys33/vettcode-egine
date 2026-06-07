@@ -1051,8 +1051,8 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
   }
 
   // Rebuild the tree structure from the maps
-  // The issue is that we need to ensure children arrays are properly populated
-  const rebuildTree = (nodeMap: Map<string, FileTreeNode>): FileTreeNode[] => {
+  // Pass paths array to inner function to avoid ReferenceError
+  const rebuildTree = (nodeMap: Map<string, FileTreeNode>, pathsArray: string[]): FileTreeNode[] => {
     const nodes = Array.from(nodeMap.values());
     for (const node of nodes) {
       if (node.type === "folder" && node.children) {
@@ -1060,7 +1060,7 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
         // But we need to ensure it's properly structured
         if (node.children.length === 0) {
           // Try to find children from the path structure
-          const childPaths = paths.filter(p => p.startsWith(node.path + "/"));
+          const childPaths = pathsArray.filter(p => p.startsWith(node.path + "/"));
           if (childPaths.length > 0) {
             // This folder should have children
             // Extract immediate children
@@ -1074,7 +1074,7 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
             // Create child nodes
             node.children = Array.from(immediateChildren).map(childName => {
               const childPath = `${node.path}/${childName}`;
-              const isFile = !paths.some(p => p.startsWith(childPath + "/"));
+              const isFile = !pathsArray.some(p => p.startsWith(childPath + "/"));
               return {
                 name: childName,
                 type: isFile ? "file" : "folder",
@@ -1089,7 +1089,7 @@ function buildFileTreeFromPaths(paths: string[]): FileTreeNode[] {
     return nodes;
   };
 
-  const treeNodes = rebuildTree(root);
+  const treeNodes = rebuildTree(root, paths);
 
   console.log(`[buildFileTreeFromPaths] Built tree with ${treeNodes.length} root nodes`);
   console.log(`[buildFileTreeFromPaths] Root nodes:`, treeNodes.map(n => ({ name: n.name, type: n.type, childrenCount: n.children?.length || 0 })));
