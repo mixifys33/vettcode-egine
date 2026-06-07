@@ -99,23 +99,31 @@ interface SmartBatch {
 
 export async function POST(req: NextRequest) {
   try {
-    // Authentication check - disabled for development, enable in production
-    // const authHeader = req.headers.get('authorization');
-    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized: Missing or invalid authentication" },
-    //     { status: 401 }
-    //   );
-    // }
+    // Authentication check - require valid authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing or invalid authentication" },
+        { status: 401 }
+      );
+    }
 
-    // Validate the token (implement your token validation logic)
-    // const token = authHeader.substring(7);
-    // if (!token || token.length < 10) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized: Invalid token" },
-    //     { status: 401 }
-    //   );
-    // }
+    // Validate the token
+    const token = authHeader.substring(7).trim();
+    if (!token || token.length < 32) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid token format" },
+        { status: 401 }
+      );
+    }
+    
+    // Verify token matches expected format (alphanumeric + hyphens)
+    if (!/^[a-zA-Z0-9-_]+$/.test(token)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid token characters" },
+        { status: 401 }
+      );
+    }
 
     const apiKeys = getApiKeys();
     // Don't log sensitive information about API keys

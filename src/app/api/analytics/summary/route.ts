@@ -8,31 +8,39 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: NextRequest) {
   try {
-    // TODO: Add admin authentication check in production
-    // const authHeader = req.headers.get('authorization');
-    // if (!isAdmin(authHeader)) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
+    // Authentication check - require admin authorization
+    const authHeader = req.headers.get('authorization');
+    const apiKey = authHeader?.replace('Bearer ', '').trim();
     
-    // In a production system, you would query this from a database
-    // For now, return a message indicating this is client-side only
+    // Validate admin API key
+    const validAdminKey = process.env.ADMIN_API_KEY;
+    if (!validAdminKey || apiKey !== validAdminKey) {
+      return NextResponse.json({ error: "Unauthorized: Admin access required" }, { status: 401 });
+    }
     
-    console.log('[Analytics] Summary endpoint accessed');
+    console.log('[Analytics] Summary endpoint accessed by authorized admin');
     
+    // Return analytics summary
+    // Note: Analytics are currently stored client-side
+    // To enable server-side analytics, implement database storage
     return NextResponse.json({
-      message: 'Analytics are currently stored client-side in localStorage. To view analytics, access them from the browser console or implement a database backend.',
-      info: {
-        clientSideStorage: true,
-        databaseImplementation: 'pending',
-        suggestedDBs: ['PostgreSQL with Prisma', 'MongoDB', 'Supabase'],
+      status: 'client-side-only',
+      message: 'Analytics are stored in browser localStorage. Server-side analytics require database implementation.',
+      implementation: {
+        required: ['Database setup', 'Analytics collection endpoint', 'Data aggregation service'],
+        recommended: ['PostgreSQL with Prisma', 'MongoDB with aggregation pipeline', 'Time-series database for metrics'],
+      },
+      clientAccess: {
+        storageKey: 'vettcode-analytics',
+        viewInConsole: 'localStorage.getItem("vettcode-analytics")',
       }
     });
     
   } catch (error) {
-    console.error('[Analytics] Error fetching summary:', error);
+    console.error('[Analytics] Error:', error);
     return NextResponse.json(
       { 
-        error: "Failed to fetch analytics",
+        error: "Internal server error",
         message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }

@@ -18,8 +18,33 @@ const REPORTS_STORAGE_KEY = "vettcode_saved_reports";
 const MAX_REPORTS = 50; // Limit to prevent localStorage overflow
 const STORAGE_VERSION_KEY = "vettcode_storage_version";
 
-// Improved mutex with version tracking for better race condition prevention
-let reportStorageMutex = Promise.resolve();
+// Improved mutex with atomic locking mechanism
+class StorageMutex {
+  private queue: Array<() => void> = [];
+  private locked = false;
+
+  async acquire(): Promise<() => void> {
+    return new Promise((resolve) => {
+      const release = () => {
+        if (this.queue.length > 0) {
+          const next = this.queue.shift();
+          if (next) next();
+        } else {
+          this.locked = false;
+        }
+      };
+
+      if (!this.locked) {
+        this.locked = true;
+        resolve(release);
+      } else {
+        this.queue.push(() => resolve(release));
+      }
+    });
+  }
+}
+
+const reportStorageMutex = new StorageMutex();
 let currentStorageVersion = 0;
 
 /**
@@ -96,47 +121,38 @@ export async function saveReport(
     scanMode,
   };
   
-  // Wait for any previous storage operation to complete
-  await reportStorageMutex;
+  // Acquire mutex lock to ensure atomic operation
+  const release = await reportStorageMutex.acquire();
   
-  // Create a new mutex for this operation with version tracking
-  const operationVersion = ++currentStorageVersion;
-  reportStorageMutex = (async () => {
-    try {
-      // Check if this operation is still the latest one
-      if (operationVersion !== currentStorageVersion) {
-        console.warn(`Storage operation ${operationVersion} superseded by ${currentStorageVersion}`);
-        return;
-      }
-      
-      const existingReports = getSavedReports();
-      
-      // Add new report at the beginning
-      const updatedReports = [savedReport, ...existingReports];
-      
-      // Limit to MAX_REPORTS
-      const limitedReports = updatedReports.slice(0, MAX_REPORTS);
-      
-      // Update storage version atomically
-      const newVersion = Date.now();
-      localStorage.setItem(`${STORAGE_VERSION_KEY}_${user.id}`, newVersion.toString());
-      
-      localStorage.setItem(
-        `${REPORTS_STORAGE_KEY}_${user.id}`,
-        JSON.stringify(limitedReports)
-      );
-    } catch (error) {
-      console.error("Error saving report:", error);
-      throw error;
-    } finally {
-      // Release the mutex
-      reportStorageMutex = Promise.resolve();
-    }
-  })();
-  
-  await reportStorageMutex;
-  
-  return savedReport;
+  try {
+    // Increment version for this operation
+    const operationVersion = ++currentStorageVersion;
+    
+    const existingReports = getSavedReports();
+    
+    // Add new report at the beginning
+    const updatedReports = [savedReport, ...existingReports];
+    
+    // Limit to MAX_REPORTS
+    const limitedReports = updatedReports.slice(0, MAX_REPORTS);
+    
+    // Update storage version atomically
+    const newVersion = Date.now();
+    localStorage.setItem(`${STORAGE_VERSION_KEY}_${user.id}`, newVersion.toString());
+    
+    localStorage.setItem(
+      `${REPORTS_STORAGE_KEY}_${user.id}`,
+      JSON.stringify(limitedReports)
+    );
+    
+    return savedReport;
+  } catch (error) {
+    console.error("Error saving report:", error);
+    throw error;
+  } finally {
+    // Always release the mutex
+    release();
+  }
 }
 
 /**

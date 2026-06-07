@@ -18,15 +18,14 @@ export function getApiKeys(): string[] {
     if (k?.trim()) keys.push(k.trim());
   }
   
-  // Debug logging (only in development or when keys are missing)
+  // Security: Never log API keys or their partial values
   if (keys.length === 0) {
     console.error('[OpenRouter] No API keys found! Check environment variables.');
-    console.error('[OpenRouter] OPENROUTER_API_KEYS:', process.env.OPENROUTER_API_KEYS ? 'SET' : 'NOT SET');
-    console.error('[OpenRouter] OPENROUTER_API_KEY_1:', process.env.OPENROUTER_API_KEY_1 ? 'SET' : 'NOT SET');
+    // Don't log which specific env vars are set/unset as this could leak information
   } else {
     const nodeEnv = process.env.NODE_ENV?.trim() || 'production';
     if (nodeEnv === 'development') {
-      console.log(`[OpenRouter] Found ${keys.length} API key(s)`);
+      console.log(`[OpenRouter] Found ${keys.length} API key(s) configured`);
     }
   }
   
@@ -47,9 +46,10 @@ export function getModels(): string[] {
 }
 
 // Rate limiting per API key to prevent exhaustion
-const keyUsageMap = new Map<string, { count: number; resetTime: number }>();
+const keyUsageMap = new Map<string, { count: number; resetTime: number; lockUntil?: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
-const MAX_REQUESTS_PER_KEY = 100; // Max requests per key per minute
+const MAX_REQUESTS_PER_KEY = 50; // Reduced from 100 to be more conservative
+const LOCK_DURATION = 120000; // 2 minutes lock after exceeding limit
 
 export function nextApiKey(): string {
   const keys = getApiKeys();
@@ -61,10 +61,15 @@ export function nextApiKey(): string {
   
   const now = Date.now();
   
-  // Try to find a key that hasn't exceeded rate limit
+  // Try to find a key that hasn't exceeded rate limit and isn't locked
   for (let i = 0; i < keys.length; i++) {
     const key = keys[(keyIndex + i) % keys.length];
     const usage = keyUsageMap.get(key);
+    
+    // Check if key is locked
+    if (usage?.lockUntil && now < usage.lockUntil) {
+      continue; // Skip locked keys
+    }
     
     // Reset usage if window has expired
     if (usage && now - usage.resetTime > RATE_LIMIT_WINDOW) {
@@ -74,15 +79,29 @@ export function nextApiKey(): string {
     }
     
     // Check if key is under rate limit
-    if (!usage || usage.count < MAX_REQUESTS_PER_KEY) {
-      keyUsageMap.set(key, { count: (usage?.count || 0) + 1, resetTime: usage?.resetTime || now });
+    if (!usage) {
+      keyUsageMap.set(key, { count: 1, resetTime: now });
       keyIndex = (keyIndex + i + 1) % keys.length;
       return key;
     }
+    
+    if (usage.count < MAX_REQUESTS_PER_KEY) {
+      keyUsageMap.set(key, { ...usage, count: usage.count + 1 });
+      keyIndex = (keyIndex + i + 1) % keys.length;
+      return key;
+    }
+    
+    // Lock the key if it exceeded the limit
+    if (!usage.lockUntil) {
+      console.warn(`[OpenRouter] API key ${i + 1} exceeded rate limit, locking for 2 minutes`);
+      keyUsageMap.set(key, { ...usage, lockUntil: now + LOCK_DURATION });
+    }
   }
   
-  // All keys are rate limited
-  throw new Error("All API keys have exceeded rate limit. Please wait before retrying.");
+  // All keys are rate limited or locked
+  const unlockTime = Math.min(...Array.from(keyUsageMap.values()).map(u => u.lockUntil || u.resetTime + RATE_LIMIT_WINDOW));
+  const waitTime = Math.ceil((unlockTime - now) / 1000);
+  throw new Error(`All API keys are rate limited. Please wait ${waitTime} seconds before retrying.`);
 }
 
 export function keyForIndex(index: number): string {
