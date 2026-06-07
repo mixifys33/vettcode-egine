@@ -96,7 +96,7 @@ export function saveScanAnalytics(rawAnalytics: ScanAnalytics): void {
     userEmail: sanitizeString(rawAnalytics.userEmail),
     userName: sanitizeString(rawAnalytics.userName),
     grade: sanitizeString(rawAnalytics.grade) || 'F',
-    errorMessage: sanitizeString(rawAnalytics.errorMessage),
+    errorMessage: sanitizeString(rawAnalytics.errorMessage) || undefined,
     
     // Sanitize numbers to prevent invalid values
     score: sanitizeNumber(rawAnalytics.score),
