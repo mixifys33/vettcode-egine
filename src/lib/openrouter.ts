@@ -125,6 +125,41 @@ export async function chatCompletion(
   keyOverride?: string,
   retries = 2
 ): Promise<ChatResult> {
+  // Input validation to prevent prompt injection
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error('Messages must be a non-empty array');
+  }
+  
+  // Validate each message structure
+  for (const msg of messages) {
+    if (!msg || typeof msg !== 'object') {
+      throw new Error('Invalid message structure');
+    }
+    if (!['system', 'user', 'assistant'].includes(msg.role)) {
+      throw new Error(`Invalid message role: ${msg.role}`);
+    }
+    if (typeof msg.content !== 'string') {
+      throw new Error('Message content must be a string');
+    }
+    // Limit message length to prevent abuse
+    if (msg.content.length > 1000000) { // 1MB limit
+      throw new Error('Message content exceeds maximum length');
+    }
+    // Check for suspicious patterns that might indicate prompt injection
+    const suspiciousPatterns = [
+      /ignore\s+(?:all\s+)?previous\s+(?:instructions?|prompts?)/gi,
+      /disregard\s+(?:all\s+)?(?:previous|prior)\s+(?:instructions?|commands?)/gi,
+      /forget\s+(?:everything|all)\s+(?:before|above)/gi,
+      /new\s+instructions?:/gi,
+    ];
+    for (const pattern of suspiciousPatterns) {
+      if (pattern.test(msg.content)) {
+        console.warn('[Security] Suspicious prompt injection pattern detected');
+        // Don't block, but log for monitoring
+      }
+    }
+  }
+  
   const apiKey = keyOverride ?? nextApiKey();
   const models = getModels();
   

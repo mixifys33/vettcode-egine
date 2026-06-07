@@ -145,8 +145,19 @@ export async function POST(req: NextRequest) {
       attempt?: number;
     };
 
-    // Sanitize project name to prevent log injection
-    const sanitizedProjectName = projectName.replace(/[\r\n\t]/g, '').slice(0, 100);
+    // Sanitize project name to prevent prompt injection and log injection
+    const sanitizeForPrompt = (input: string): string => {
+      return input
+        .replace(/[\r\n\t]/g, ' ') // Remove newlines and tabs
+        .replace(/[<>'"{}[\]]/g, '') // Remove special characters
+        .replace(/javascript:/gi, '') // Remove javascript: protocol
+        .replace(/on\w+=/gi, '') // Remove event handlers
+        .replace(/\\/g, '') // Remove backslashes
+        .trim()
+        .slice(0, 200); // Limit length
+    };
+    
+    const sanitizedProjectName = sanitizeForPrompt(projectName);
     console.log(`[Smart Batch ${batchIndex}/${totalBatches}] Processing batch for ${sanitizedProjectName} (attempt ${attempt + 1})`);
     console.log(`[Smart Batch ${batchIndex}] Sections: ${batch.sections?.length || 0}, Static findings: ${batch.staticFindings?.length || 0}`);
 

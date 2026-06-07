@@ -325,13 +325,21 @@ function resolveImport(importPath: string, fromFile: string, graph: ReferenceGra
 }
 
 /**
- * Build recursive dependency chain for a file
+ * Build recursive dependency chain for a file with depth limiting
  */
 function buildDependencyChain(
   filePath: string,
   graph: ReferenceGraph,
-  visited: Set<string>
+  visited: Set<string>,
+  depth: number = 0,
+  maxDepth: number = 50 // Prevent stack overflow
 ): string[] {
+  // Depth check to prevent infinite recursion
+  if (depth >= maxDepth) {
+    console.warn(`[Dependency Chain] Max depth ${maxDepth} reached for ${filePath}`);
+    return [];
+  }
+  
   if (visited.has(filePath)) return [];
   visited.add(filePath);
   
@@ -344,7 +352,8 @@ function buildDependencyChain(
     const importedFile = resolveImport(imp.from, filePath, graph);
     if (importedFile) {
       chain.push(importedFile);
-      chain.push(...buildDependencyChain(importedFile, graph, visited));
+      // Pass depth + 1 to track recursion level
+      chain.push(...buildDependencyChain(importedFile, graph, visited, depth + 1, maxDepth));
     }
   }
   
@@ -352,28 +361,48 @@ function buildDependencyChain(
 }
 
 /**
- * Check if a file or its dependencies have size validation
+ * Check if a file or its dependencies have size validation with depth limiting
  */
 export function hasSizeValidationInChain(
   filePath: string,
-  graph: ReferenceGraph
+  graph: ReferenceGraph,
+  maxDepth: number = 20 // Limit dependency traversal depth
 ): boolean {
-  const ref = graph.files.get(filePath);
-  if (!ref) return false;
+  const visited = new Set<string>();
   
-  // Check current file
-  if (ref.securityConstants.some(c => c.type === 'size_limit')) {
-    return true;
+  function checkWithDepth(file: string, depth: number): boolean {
+    // Prevent excessive traversal
+    if (depth >= maxDepth || visited.has(file)) {
+      return false;
+    }
+    visited.add(file);
+    
+    const ref = graph.files.get(file);
+    if (!ref) return false;
+    
+    // Check current file
+    if (ref.securityConstants.some(c => c.type === 'size_limit')) {
+      return true;
+    }
+    
+    if (ref.validationFunctions.some(v => v.validates === 'size')) {
+      return true;
+    }
+    
+    // Check dependencies with depth limit
+    const deps = graph.dependencyChains.get(file) || [];
+    // Limit number of dependencies to check per level
+    for (const dep of deps.slice(0, 50)) {
+      if (checkWithDepth(dep, depth + 1)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
   
-  if (ref.validationFunctions.some(v => v.validates === 'size')) {
-    return true;
-  }
-  
-  // Check dependencies
-  const deps = graph.dependencyChains.get(filePath) || [];
-  for (const dep of deps) {
-    const depRef = graph.files.get(dep);
+  return checkWithDepth(filePath, 0);
+}
     if (!depRef) continue;
     
     if (depRef.securityConstants.some(c => c.type === 'size_limit')) {

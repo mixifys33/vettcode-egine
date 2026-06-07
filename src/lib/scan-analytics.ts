@@ -3,6 +3,26 @@
  * Logs all scans with user information, scores, and results for analytics
  */
 
+// Security: Sanitize user inputs to prevent XSS
+function sanitizeString(input: string | null | undefined): string | null {
+  if (!input) return null;
+  
+  // Remove HTML tags and dangerous characters
+  return input
+    .replace(/[<>'"]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '')
+    .trim()
+    .slice(0, 1000); // Limit length to prevent storage issues
+}
+
+function sanitizeNumber(input: number): number {
+  // Ensure finite number and prevent NaN/Infinity
+  if (!Number.isFinite(input)) return 0;
+  // Clamp to reasonable range
+  return Math.max(0, Math.min(input, Number.MAX_SAFE_INTEGER));
+}
+
 export interface ScanAnalytics {
   id: string;
   timestamp: string;
@@ -63,10 +83,39 @@ export function getAllAnalytics(): ScanAnalytics[] {
 }
 
 /**
- * Save a single scan analytics entry
+ * Save a single scan analytics entry with input sanitization
  */
-export function saveScanAnalytics(analytics: ScanAnalytics): void {
+export function saveScanAnalytics(rawAnalytics: ScanAnalytics): void {
   if (typeof window === 'undefined') return;
+  
+  // Sanitize all string inputs to prevent XSS and injection attacks
+  const analytics: ScanAnalytics = {
+    ...rawAnalytics,
+    // Sanitize user-provided strings
+    projectName: sanitizeString(rawAnalytics.projectName) || 'Unknown Project',
+    userEmail: sanitizeString(rawAnalytics.userEmail),
+    userName: sanitizeString(rawAnalytics.userName),
+    grade: sanitizeString(rawAnalytics.grade) || 'F',
+    errorMessage: sanitizeString(rawAnalytics.errorMessage),
+    
+    // Sanitize numbers to prevent invalid values
+    score: sanitizeNumber(rawAnalytics.score),
+    filesScanned: sanitizeNumber(rawAnalytics.filesScanned),
+    linesScanned: sanitizeNumber(rawAnalytics.linesScanned),
+    criticalFindings: sanitizeNumber(rawAnalytics.criticalFindings),
+    highFindings: sanitizeNumber(rawAnalytics.highFindings),
+    mediumFindings: sanitizeNumber(rawAnalytics.mediumFindings),
+    lowFindings: sanitizeNumber(rawAnalytics.lowFindings),
+    infoFindings: sanitizeNumber(rawAnalytics.infoFindings),
+    totalFindings: sanitizeNumber(rawAnalytics.totalFindings),
+    scanDurationMs: sanitizeNumber(rawAnalytics.scanDurationMs),
+    
+    // Sanitize arrays
+    scannersUsed: rawAnalytics.scannersUsed
+      .map(s => sanitizeString(s))
+      .filter((s): s is string => s !== null)
+      .slice(0, 20), // Limit array size
+  };
   
   const existing = getAllAnalytics();
   
@@ -76,7 +125,18 @@ export function saveScanAnalytics(analytics: ScanAnalytics): void {
   // Keep only the most recent entries
   const trimmed = existing.slice(0, MAX_LOCAL_ANALYTICS);
   
-  localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(trimmed));
+  try {
+    localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (error) {
+    console.error('Failed to save analytics:', error);
+    // If storage fails (quota exceeded), clear old entries and try again
+    const reduced = trimmed.slice(0, Math.floor(MAX_LOCAL_ANALYTICS / 2));
+    try {
+      localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(reduced));
+    } catch (retryError) {
+      console.error('Failed to save analytics even after reducing size:', retryError);
+    }
+  }
 }
 
 /**
