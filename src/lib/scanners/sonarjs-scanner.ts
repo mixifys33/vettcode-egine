@@ -72,54 +72,122 @@ async function runESLintWithSonarJS(files: CodeFile[]): Promise<SonarJSResult["i
     (f) => f.path.match(/\.(js|ts|jsx|tsx)$/) && !f.path.includes("node_modules")
   );
 
+  if (codeFiles.length === 0) {
+    return issues;
+  }
+
   try {
     // Dynamic imports for Node.js modules
     const { exec } = await import("child_process");
     const { promisify } = await import("util");
-    const { writeFile, existsSync, mkdirSync } = await import("fs");
+    const { writeFile, mkdir, rm } = await import("fs/promises");
     const { join } = await import("path");
     const { tmpdir } = await import("os");
 
     const execAsync = promisify(exec);
-    const writeFileAsync = promisify(writeFile);
 
     // Create temporary directory for files
     const tempDir = join(tmpdir(), `sonarjs-scan-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
 
-    // Create directory structure and write files asynchronously
+    console.log(`[SonarJS] Created temp directory: ${tempDir}`);
+    console.log(`[SonarJS] Analyzing ${codeFiles.length} files with ESLint + SonarJS plugin`);
+
+    // Write files to temp directory
     for (const file of codeFiles) {
       const filePath = join(tempDir, file.path);
       const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
-      if (dirPath && !existsSync(dirPath)) {
-        mkdirSync(dirPath, { recursive: true });
+      
+      if (dirPath) {
+        await mkdir(dirPath, { recursive: true });
       }
-      // Write file content asynchronously
-      await writeFileAsync(filePath, file.content, "utf-8");
+      
+      await writeFile(filePath, file.content, "utf-8");
     }
+
+    // Create ESLint config that uses SonarJS plugin
+    const eslintConfig = {
+      root: true,
+      parser: "@typescript-eslint/parser",
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+      },
+      plugins: ["sonarjs"],
+      extends: ["plugin:sonarjs/recommended"],
+      rules: {
+        // Enable key SonarJS rules explicitly
+        "sonarjs/cognitive-complexity": ["error", 15],
+        "sonarjs/no-duplicate-string": "error",
+        "sonarjs/no-identical-functions": "error",
+        "sonarjs/no-collapsible-if": "warn",
+        "sonarjs/prefer-immediate-return": "warn",
+      },
+    };
+
+    const configPath = join(tempDir, ".eslintrc.json");
+    await writeFile(configPath, JSON.stringify(eslintConfig, null, 2), "utf-8");
 
     // Run ESLint with SonarJS plugin
-    const { stdout, stderr } = await execAsync(
-      `npx eslint "${tempDir}/**/*.{js,ts,jsx,tsx}" --format json --config .eslintrc.json`,
-      {
-        cwd: process.cwd(),
-        timeout: 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      }
-    );
-
-    // Parse ESLint JSON output
-    const eslintOutput = JSON.parse(stdout);
-    for (const result of eslintOutput) {
-      for (const message of result.messages) {
-        const issue = eslintMessageToSonarJSIssue(result.filePath, message);
-        if (issue) {
-          issues.push(issue);
+    try {
+      const { stdout, stderr } = await execAsync(
+        `npx eslint . --ext .js,.ts,.jsx,.tsx --format json --no-eslintrc --config .eslintrc.json`,
+        {
+          cwd: tempDir,
+          timeout: 120000, // 2 minutes
+          maxBuffer: 20 * 1024 * 1024, // 20MB
         }
+      );
+
+      if (stdout) {
+        // Parse ESLint JSON output
+        const eslintOutput = JSON.parse(stdout);
+        
+        for (const result of eslintOutput) {
+          if (!result.messages || result.messages.length === 0) continue;
+          
+          for (const message of result.messages) {
+            const issue = eslintMessageToSonarJSIssue(result.filePath, message, tempDir);
+            if (issue) {
+              issues.push(issue);
+            }
+          }
+        }
+        
+        console.log(`[SonarJS] Found ${issues.length} issues using ESLint + SonarJS plugin`);
+      }
+
+      if (stderr && !stderr.includes("warning")) {
+        console.warn(`[SonarJS] ESLint stderr:`, stderr);
+      }
+    } catch (execError: any) {
+      // ESLint exits with code 1 if there are linting errors, but still provides JSON output
+      if (execError.stdout) {
+        const eslintOutput = JSON.parse(execError.stdout);
+        
+        for (const result of eslintOutput) {
+          if (!result.messages || result.messages.length === 0) continue;
+          
+          for (const message of result.messages) {
+            const issue = eslintMessageToSonarJSIssue(result.filePath, message, tempDir);
+            if (issue) {
+              issues.push(issue);
+            }
+          }
+        }
+        
+        console.log(`[SonarJS] Found ${issues.length} issues (ESLint exited with code 1, but provided results)`);
+      } else {
+        throw execError;
       }
     }
+
+    // Cleanup temp directory
+    await rm(tempDir, { recursive: true, force: true });
+    console.log(`[SonarJS] Cleaned up temp directory`);
+
   } catch (error: any) {
-    // ESLint might not be installed or SonarJS plugin not available
-    console.error("ESLint with SonarJS failed, falling back to simplified analysis:", error.message);
+    console.error(`[SonarJS] Failed to run ESLint with SonarJS:`, error.message);
     throw error;
   }
 
@@ -128,8 +196,12 @@ async function runESLintWithSonarJS(files: CodeFile[]): Promise<SonarJSResult["i
 
 function eslintMessageToSonarJSIssue(
   filePath: string,
-  message: any
+  message: any,
+  tempDir: string
 ): SonarJSResult["issues"][0] | null {
+  // Remove temp directory path to get relative file path
+  const relativePath = filePath.replace(tempDir + "/", "").replace(tempDir + "\\", "");
+  
   // Map ESLint rule IDs to SonarJS rule types
   const ruleId = message.ruleId || "unknown";
 
@@ -139,17 +211,17 @@ function eslintMessageToSonarJSIssue(
     type = "security_hotspot";
   } else if (ruleId.includes("vulnerability")) {
     type = "vulnerability";
-  } else if (ruleId.includes("bug") || ruleId.includes("error")) {
+  } else if (ruleId.includes("bug") || ruleId.includes("error") || ruleId.includes("no-identical")) {
     type = "bug";
   }
 
   return {
-    id: `${ruleId}-${filePath}-${message.line}`,
+    id: `${ruleId}-${relativePath}-${message.line}`,
     rule: ruleId,
     severity: "suggestion",
     type,
     message: message.message,
-    file: filePath,
+    file: relativePath,
     line: message.line || 1,
     column: message.column,
     effort: "5min",

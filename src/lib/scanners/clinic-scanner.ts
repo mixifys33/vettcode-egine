@@ -33,9 +33,31 @@ export async function scanWithClinic(files: CodeFile[]): Promise<ClinicResult> {
     f.path.match(/\.(js|ts|jsx|tsx)$/) && !f.path.includes("node_modules")
   );
 
-  for (const file of codeFiles) {
-    const fileIssues = await analyzePerformance(file);
-    performanceIssues.push(...fileIssues);
+  // Check if we're in a server environment
+  const isServer = typeof window === "undefined";
+
+  if (isServer) {
+    // Try to run real Clinic.js analysis first
+    try {
+      console.log(`[Clinic.js] Attempting to run Clinic.js doctor for performance analysis...`);
+      const clinicResults = await runClinicDoctor(codeFiles);
+      performanceIssues.push(...clinicResults);
+      console.log(`[Clinic.js] Found ${clinicResults.length} performance issues using Clinic.js`);
+    } catch (error: any) {
+      console.warn(`[Clinic.js] Failed to run Clinic.js doctor:`, error.message);
+      console.log(`[Clinic.js] Falling back to pattern-based analysis`);
+      // Fall back to pattern-based analysis
+      for (const file of codeFiles) {
+        const fileIssues = await analyzePerformance(file);
+        performanceIssues.push(...fileIssues);
+      }
+    }
+  } else {
+    // Client-side: use pattern-based analysis
+    for (const file of codeFiles) {
+      const fileIssues = await analyzePerformance(file);
+      performanceIssues.push(...fileIssues);
+    }
   }
 
   const summary = {
@@ -48,6 +70,118 @@ export async function scanWithClinic(files: CodeFile[]): Promise<ClinicResult> {
   };
 
   return { performanceIssues, summary };
+}
+
+/**
+ * Run actual Clinic.js doctor command for deep performance analysis
+ */
+async function runClinicDoctor(files: CodeFile[]): Promise<ClinicResult["performanceIssues"]> {
+  const issues: ClinicResult["performanceIssues"] = [];
+
+  try {
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const { writeFile, mkdir, rm, readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    const { tmpdir } = await import("os");
+
+    const execAsync = promisify(exec);
+
+    // Create temp directory and entry point
+    const tempDir = join(tmpdir(), `clinic-scan-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
+
+    // Write all files to temp directory
+    for (const file of files) {
+      const filePath = join(tempDir, file.path);
+      const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
+      
+      if (dirPath) {
+        await mkdir(dirPath, { recursive: true });
+      }
+      
+      await writeFile(filePath, file.content, "utf-8");
+    }
+
+    // Create a simple entry point script that loads and analyzes the code
+    const entryScript = `
+      // Clinic.js doctor entry point
+      console.log('Starting performance analysis...');
+      
+      // Load and execute code files
+      ${files
+        .filter(f => f.path.endsWith(".js") || f.path.endsWith(".ts"))
+        .slice(0, 3) // Analyze first 3 files to keep it fast
+        .map(f => `
+      try {
+        require('./${f.path.replace(/\\/g, "/")}');
+      } catch (e) {
+        console.error('Error loading ${f.path}:', e.message);
+      }
+      `)
+        .join("\n")}
+      
+      // Exit after brief execution
+      setTimeout(() => {
+        console.log('Analysis complete');
+        process.exit(0);
+      }, 1000);
+    `;
+
+    const entryPath = join(tempDir, "clinic-entry.js");
+    await writeFile(entryPath, entryScript, "utf-8");
+
+    console.log(`[Clinic.js] Running: clinic doctor -- node clinic-entry.js`);
+
+    // Run Clinic.js doctor
+    const { stdout, stderr } = await execAsync(
+      `npx clinic doctor --on-port 'echo "Server started"' -- node clinic-entry.js`,
+      {
+        cwd: tempDir,
+        timeout: 30000, // 30 seconds
+        maxBuffer: 10 * 1024 * 1024,
+      }
+    );
+
+    console.log(`[Clinic.js] Analysis completed`);
+
+    // Parse Clinic.js output for performance issues
+    if (stdout) {
+      const lines = stdout.split("\n");
+      for (const line of lines) {
+        // Look for performance warnings in output
+        if (line.includes("event loop") || line.includes("delay")) {
+          issues.push({
+            id: `clinic-eventloop-${issues.length}`,
+            type: "event_loop_lag",
+            severity: "medium",
+            message: "Event loop delays detected by Clinic.js",
+            file: "multiple files",
+            recommendation: "Review async operations and reduce blocking code",
+          });
+        }
+        if (line.includes("memory") || line.includes("heap")) {
+          issues.push({
+            id: `clinic-memory-${issues.length}`,
+            type: "memory_leak",
+            severity: "high",
+            message: "Memory usage patterns detected by Clinic.js",
+            file: "multiple files",
+            recommendation: "Review memory allocations and cleanup",
+          });
+        }
+      }
+    }
+
+    // Cleanup
+    await rm(tempDir, { recursive: true, force: true });
+
+  } catch (error: any) {
+    console.error(`[Clinic.js] Error running clinic doctor:`, error.message);
+    throw error;
+  }
+
+  return issues;
 }
 
 async function analyzePerformance(file: CodeFile): Promise<ClinicResult["performanceIssues"]> {
