@@ -503,6 +503,102 @@ export function ReportView({
           </span>
           <span className="score-grade">{report.grade}</span>
         </div>
+        
+        {/* Score Breakdown Display */}
+        {report.metadata?.scoreExplanation && (
+          <div style={{
+            marginTop: "0.75rem",
+            padding: "0.75rem",
+            background: "var(--bg-secondary)",
+            borderRadius: "8px",
+            fontSize: "0.8rem",
+            lineHeight: 1.5,
+            maxWidth: "280px",
+          }}>
+            <div style={{ 
+              fontWeight: 600, 
+              marginBottom: "0.5rem",
+              color: "var(--text)",
+              fontSize: "0.85rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}>
+              <Target size={16} />
+              Score Breakdown
+            </div>
+            
+            {/* Static Analysis Score (without AI) */}
+            {report.metadata.staticOnlyScore !== undefined && (
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                marginBottom: "0.3rem",
+                color: "var(--muted)",
+              }}>
+                <span>Static Analysis:</span>
+                <strong style={{ color: "var(--text)" }}>
+                  {report.metadata.staticOnlyScore}/100
+                </strong>
+              </div>
+            )}
+            
+            {/* Full Score (with AI verification) */}
+            {report.metadata.fullScore !== undefined && (
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                marginBottom: "0.3rem",
+                color: "var(--muted)",
+              }}>
+                <span>With AI Verification:</span>
+                <strong style={{ color: "var(--text)" }}>
+                  {report.metadata.fullScore}/100
+                </strong>
+              </div>
+            )}
+            
+            {/* Final Score */}
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              paddingTop: "0.4rem",
+              borderTop: "1px solid var(--border)",
+              marginTop: "0.4rem",
+              color: "var(--text)",
+              fontWeight: 600,
+            }}>
+              <span>Final Score:</span>
+              <strong style={{ color: scoreColor(report.score) }}>
+                {report.score}/100
+              </strong>
+            </div>
+            
+            {/* Explanation */}
+            <div style={{
+              marginTop: "0.6rem",
+              padding: "0.5rem",
+              background: "var(--bg-tertiary)",
+              borderRadius: "6px",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              lineHeight: 1.4,
+            }}>
+              <div style={{ 
+                marginBottom: "0.3rem", 
+                fontWeight: 600, 
+                color: "var(--text)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}>
+                <AlertTriangle size={14} />
+                How we calculated this:
+              </div>
+              {report.metadata.scoreExplanation}
+            </div>
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 220 }}>
           <p className="report-title">Vetting report</p>
           <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
