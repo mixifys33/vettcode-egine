@@ -373,6 +373,7 @@ function validateByCategory(
         // Check for manual validation
         if (/if\s*\([^)]*(?:!|typeof|instanceof|Array\.isArray)\s*[^)]*\)\s*\{?\s*(?:throw|return)/i.test(fullContext)) {
           return {
+            isFalsePositive: false,
             adjustConfidence: "medium",
             reason: "Manual validation is present, review for completeness",
           };
