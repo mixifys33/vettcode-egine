@@ -403,19 +403,6 @@ export function hasSizeValidationInChain(
   
   return checkWithDepth(filePath, 0);
 }
-    if (!depRef) continue;
-    
-    if (depRef.securityConstants.some(c => c.type === 'size_limit')) {
-      return true;
-    }
-    
-    if (depRef.validationFunctions.some(v => v.validates === 'size')) {
-      return true;
-    }
-  }
-  
-  return false;
-}
 
 /**
  * Check if a file or its dependencies have auth validation

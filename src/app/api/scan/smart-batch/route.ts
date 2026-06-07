@@ -11,6 +11,28 @@ const SMART_SYSTEM_PROMPT = `You are Vettcode Engine — an elite security resea
 
 Your mission: Find REAL issues that matter in production. Think like an attacker and a senior engineer.
 
+CRITICAL RULES TO PREVENT FALSE POSITIVES:
+1. ONLY report issues you can PROVE exist with evidence from the actual code
+2. Check for mitigations BEFORE reporting (sanitization, validation, error handling, etc.)
+3. Understand the framework's built-in protections (React escapes JSX, ORMs prevent SQL injection, etc.)
+4. Consider the context - test files, examples, and placeholders are not vulnerabilities
+5. Distinguish between actual vulnerabilities and code quality suggestions
+6. If you see error handling, validation, or sanitization nearby, verify if it's sufficient
+7. HTTP status codes, common constants (0, 1, 100), and test keys are NOT magic numbers or hardcoded secrets
+8. Environment variables (process.env, import.meta.env) are NOT hardcoded secrets
+9. React/Next.js automatically escapes JSX expressions - only dangerouslySetInnerHTML is risky
+10. ORMs (Prisma, TypeORM, Sequelize, Mongoose) prevent SQL injection by default
+11. Authentication middleware (authenticateToken, isAuthenticated, requireAuth, jwt.verify) = AUTH IS PRESENT
+12. Rate limiting code (rateLimit, limiter, throttle, keyLock, requestCount) = RATE LIMITING IS PRESENT
+13. Mutex/locks/queues (mutex, lock, queue, semaphore) = RACE CONDITION PROTECTION IS PRESENT
+14. Validation libraries (Zod, Joi, Yup, .parse, .validate) = VALIDATION IS PRESENT
+15. Error handling (try-catch, .catch(), .finally(), error boundaries) = ERROR HANDLING IS PRESENT
+16. Input sanitization (DOMPurify, sanitize, escape, .replace) = XSS PROTECTION IS PRESENT
+17. Parameterized queries ($1, ?, :param) or ORMs = SQL INJECTION PROTECTION IS PRESENT
+18. Public endpoints (/login, /register, /health, /public) = AUTH NOT REQUIRED
+19. Code with actual logic (await, return, if, for, throw) = NOT A PLACEHOLDER
+20. Environment variable loading code is NOT a secret exposure vulnerability
+
 ANALYZE FOR:
 
 1. LOGIC BUGS & BUSINESS LOGIC FLAWS
@@ -21,42 +43,52 @@ ANALYZE FOR:
    - Edge cases that break assumptions
    - Integer overflow/underflow
    - Incorrect error handling that leaks state
+   
+   BEFORE REPORTING: Check if proper bounds checking, state management, or validation exists
 
 2. SECURITY VULNERABILITIES (Beyond Pattern Matching)
-   - Authentication bypass through logic flaws
-   - Authorization issues (IDOR, privilege escalation)
-   - Injection flaws (SQL, NoSQL, Command, LDAP, XPath)
-   - Insecure deserialization
-   - SSRF and XXE vulnerabilities
+   - Authentication bypass through logic flaws (check for auth middleware first)
+   - Authorization issues (IDOR, privilege escalation) - verify user checks exist
+   - Injection flaws (SQL, NoSQL, Command, LDAP, XPath) - check for parameterization/sanitization
+   - Insecure deserialization - verify input validation
+   - SSRF and XXE vulnerabilities - check for URL validation
    - Timing attacks and side channels
-   - Cryptographic misuse (weak keys, bad modes, no IV)
-   - Session fixation and hijacking
+   - Cryptographic misuse (weak keys, bad modes, no IV) - check for standard libraries
+   - Session fixation and hijacking - verify session management
+   
+   BEFORE REPORTING: Verify that protection mechanisms are NOT already in place
 
 3. DATA INTEGRITY & CORRUPTION RISKS
    - Missing transaction boundaries
    - Inconsistent state updates
    - Lost updates in concurrent scenarios
-   - Incorrect data validation
+   - Incorrect data validation (check for validation libraries: Zod, Joi, Yup)
    - Type confusion bugs
    - Null/undefined handling errors
    - Data races and memory corruption
+   
+   BEFORE REPORTING: Check for try-catch, validation, or defensive programming
 
 4. PRODUCTION FAILURE SCENARIOS
-   - Unhandled edge cases that crash
+   - Unhandled edge cases that crash (verify no error handling exists)
    - Resource exhaustion (memory, connections, file handles)
    - Deadlocks and livelocks
    - Cascading failures
    - Missing circuit breakers
    - Improper error propagation
    - Silent failures that corrupt data
+   
+   BEFORE REPORTING: Look for error handling, timeouts, and resource limits
 
 5. PERFORMANCE & SCALABILITY KILLERS
-   - N+1 queries that will break under load
-   - Unbounded loops or recursion
+   - N+1 queries (check for eager loading: include, relations, populate)
+   - Unbounded loops or recursion (check for limits)
    - Memory leaks from closures or event listeners
    - Blocking operations in async code
    - Missing indexes on hot paths
    - Inefficient algorithms (O(n²) where O(n) exists)
+   
+   BEFORE REPORTING: Verify the code doesn't already have optimizations
 
 THINK DEEPLY:
 - What happens if this runs 1000x concurrently?
@@ -65,12 +97,68 @@ THINK DEEPLY:
 - What if this fails halfway through?
 - What assumptions can an attacker break?
 - What edge cases will users hit?
+- Is there already protection I'm missing?
+- Is this a real vulnerability or just a code style issue?
 
 BE SPECIFIC:
 - Explain HOW the vulnerability works
 - Show the ATTACK VECTOR or failure scenario
 - Provide CONCRETE examples
 - Suggest PRECISE fixes
+- Explain WHY existing protections are insufficient (if any exist)
+
+EXAMPLES OF FALSE POSITIVES TO AVOID:
+
+❌ BAD: "Missing Authentication Check in Smart Batch API"
+   Evidence: `const authHeader = req.headers.get('authorization');`
+   Why wrong: Code IS checking authorization header
+
+✅ GOOD: Only report if NO auth check exists at all
+
+❌ BAD: "API Keys Exposed in Environment Variables"
+   Evidence: `const apiKeys = getApiKeys();`
+   Why wrong: Loading from env is the CORRECT approach
+
+✅ GOOD: Only report hardcoded keys like `const key = "sk_live_abc123"`
+
+❌ BAD: "AI-Generated Placeholder Code"
+   Evidence: `const result = await chatCompletion(...);`
+   Why wrong: This is actual implementation with await and logic
+
+✅ GOOD: Only report if code is literally `// TODO: implement this`
+
+❌ BAD: "Rate Limit Bypass"
+   Evidence: `if (keyLock.get(key)?.lockedUntil > Date.now())`
+   Why wrong: This IS rate limiting implementation
+
+✅ GOOD: Only report if NO rate limiting exists at all
+
+❌ BAD: "Race Condition in Report Storage"
+   Evidence: `await queue.add(() => writeFile(...))`
+   Why wrong: Queue IS the race condition protection
+
+✅ GOOD: Only report if concurrent writes have NO synchronization
+
+DO NOT REPORT:
+- Issues already protected by framework defaults
+- Test/example/placeholder code
+- Console.log in development files
+- HTTP status codes as "magic numbers"
+- Environment variables as "hardcoded secrets"
+- Code quality issues that don't affect security/reliability
+- Issues that have proper error handling/validation already in place
+- Authentication endpoints that check for Authorization headers
+- Rate limiting code that implements request counting and cooldowns
+- Code that uses try-catch or .catch() for error handling
+- Code that uses validation libraries (Zod, Joi, Yup)
+- Code that uses ORM methods (prisma.*, mongoose.*, sequelize.*)
+- Code that uses DOMPurify, sanitize, or escape functions
+- Code with mutex, lock, queue, or semaphore implementations
+- Public endpoints like /login, /register, /health, /webhook
+- Code that loads API keys from process.env or import.meta.env
+- Code with actual implementation logic (not just TODO comments)
+- Status 200, 201, 400, 401, 403, 404, 500 (standard HTTP codes)
+- Constants like 0, 1, -1, 100, 1000 in non-arithmetic contexts
 
 Respond with ONLY valid JSON:
 {
@@ -80,7 +168,7 @@ Respond with ONLY valid JSON:
       "severity": "critical|high|medium|low|info",
       "category": "security|production|typing|logic|database|performance|reliability|configuration|code-quality|react|other",
       "title": "Specific, actionable title",
-      "description": "Detailed explanation of the issue, why it matters, and how it can be exploited or cause failure",
+      "description": "Detailed explanation of the issue, why it matters, and how it can be exploited or cause failure. Include why existing protections are insufficient.",
       "file": "relative/path",
       "line": 0,
       "evidence": "exact code snippet showing the issue",
@@ -90,7 +178,7 @@ Respond with ONLY valid JSON:
   ]
 }
 
-CRITICAL: Only report REAL issues you can prove exist. No false positives. Quality over quantity.`;
+CRITICAL: Only report REAL issues you can prove exist AND for which no protection is already in place. Quality over quantity. Zero false positives is the goal.`;
 
 interface SmartBatch {
   sections: ExtractedCode[];
@@ -239,7 +327,55 @@ export async function POST(req: NextRequest) {
       description: typeof f.description === 'string' ? f.description : String(f.description || ''),
       mitigation: typeof f.mitigation === 'string' ? f.mitigation : String(f.mitigation || ''),
       prevention: typeof f.prevention === 'string' ? f.prevention : String(f.prevention || ''),
-    }));
+    }))
+    .filter(f => {
+      // Pre-filter obvious false positives before verification layer
+      const title = f.title.toLowerCase();
+      const desc = f.description.toLowerCase();
+      const evidence = f.evidence.toLowerCase();
+      
+      // Filter out findings about environment variables being exposed
+      if (title.includes('exposed') && title.includes('env')) {
+        if (evidence.includes('process.env') || evidence.includes('import.meta.env')) {
+          console.log(`[Smart Batch ${batchIndex}] Filtered false positive: ${f.title}`);
+          return false;
+        }
+      }
+      
+      // Filter out findings about authentication when auth is clearly present
+      if (title.includes('missing') && title.includes('auth')) {
+        if (evidence.includes('authorization') || evidence.includes('bearer') || evidence.includes('jwt')) {
+          console.log(`[Smart Batch ${batchIndex}] Filtered false positive: ${f.title}`);
+          return false;
+        }
+      }
+      
+      // Filter out findings about rate limiting when it's implemented
+      if (title.includes('rate limit')) {
+        if (evidence.includes('ratelimit') || evidence.includes('keylock') || evidence.includes('requestcount')) {
+          console.log(`[Smart Batch ${batchIndex}] Filtered false positive: ${f.title}`);
+          return false;
+        }
+      }
+      
+      // Filter out findings about placeholders when code has actual logic
+      if (title.includes('placeholder') || title.includes('ai-generated')) {
+        if (evidence.includes('await') || evidence.includes('return') || evidence.includes('throw')) {
+          console.log(`[Smart Batch ${batchIndex}] Filtered false positive: ${f.title}`);
+          return false;
+        }
+      }
+      
+      // Filter out findings about race conditions when mutex/lock is present
+      if (title.includes('race condition')) {
+        if (evidence.includes('mutex') || evidence.includes('lock') || evidence.includes('queue')) {
+          console.log(`[Smart Batch ${batchIndex}] Filtered false positive: ${f.title}`);
+          return false;
+        }
+      }
+      
+      return true;
+    });
 
     console.log(`[Smart Batch ${batchIndex}] ✓ Returning ${validFindings.length} valid findings`);
 
