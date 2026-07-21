@@ -240,6 +240,96 @@ button {
   margin-top: 0.1rem;
 }
 
+/* —— CLI Banner —— */
+.cli-banner {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.1rem 1.2rem;
+  margin: 1.5rem 0;
+  border-radius: var(--radius);
+  border: 1px solid rgba(91, 124, 250, 0.3);
+  background: linear-gradient(135deg, rgba(91, 124, 250, 0.08), rgba(34, 211, 165, 0.05));
+  font-size: 0.88rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.cli-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.1rem;
+}
+
+.cli-icon svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.cli-content {
+  flex: 1;
+}
+
+.cli-content strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.95rem;
+}
+
+.cli-content p {
+  margin-bottom: 0.7rem;
+  color: var(--muted);
+}
+
+.cli-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cli-commands code {
+  display: inline-block;
+  padding: 0.5rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  user-select: all;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cli-commands code:hover {
+  background: var(--surface2);
+  border-color: var(--primary);
+}
+
+@media (max-width: 640px) {
+  .cli-banner {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .cli-icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .cli-commands code {
+    font-size: 0.75rem;
+  }
+}
+
 /* —— Scan mode —— */
 .scan-mode-panel {
   margin-bottom: 1.25rem;

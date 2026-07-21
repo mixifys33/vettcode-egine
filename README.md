@@ -6,6 +6,53 @@ Upload any codebase and get a brutally honest 0-100 security/quality score with 
 
 > **💰 [Read why VettCode is completely FREE →](./FREE.md)**
 
+## 🚀 Available in Two Flavors
+
+### 🌐 **Web Version** (This Repository)
+
+Upload code directly in your browser with real-time scanning:
+
+- **Live at:** [VettCode Engine](https://vettcode-egine.vercel.app) 
+- No installation required
+- Visual interface with progress tracking
+- Report history and saved scans
+
+### ⚡ **CLI Version** ([vettcode-cli](https://www.npmjs.com/package/vettcode-cli))
+
+Run scans directly from your terminal for CI/CD integration:
+
+```bash
+# Install globally
+npm install -g vettcode-cli
+
+# Scan current directory
+vettcode .
+
+# Scan specific directory
+vettcode /path/to/project
+
+# Quick scan (faster)
+vettcode . --mode quick
+
+# Deep scan (more thorough)
+vettcode . --mode deep
+
+# Disable AI (static analysis only)
+vettcode . --no-ai
+```
+
+**Perfect for:**
+
+- CI/CD pipelines
+- Pre-commit hooks
+- Automated security checks
+- Developer workflows
+- GitHub Actions / GitLab CI
+
+**CLI Repository:** https://github.com/mixifys33/vettcode-cli
+
+---
+
 ## 🆓 Completely Free
 
 - ✅ **No payments** — Zero cost, forever
