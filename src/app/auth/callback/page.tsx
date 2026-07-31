@@ -66,7 +66,7 @@ function CallbackContent() {
         name: sanitizedName,
         email: sanitizedEmail,
         token,
-        userType: "Seller",
+        role: "Seller",
       });
 
       // Reset scan count - seller gets unlimited scans
