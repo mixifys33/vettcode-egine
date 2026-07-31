@@ -19,12 +19,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
 
-  const BACKEND_URL =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  // Use unified API configuration
+  const BACKEND_URL = process.env.NEXT_PUBLIC_LANDING_API_URL || 'https://vettcodecli.vercel.app';
   
   // Prevent modal close during Google auth
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -120,18 +118,16 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     try {
       setGoogleAuthStep("Verifying your Google account...");
       
-      // Send the raw Google credential (JWT) to backend for verification
-      // Backend should verify the signature, expiration, and audience
       const credential = response.credential;
       
       setGoogleAuthStep("Authenticating with backend...");
       
-      // Send credential to backend for OAuth login/registration
-      const oauthRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/google-oauth`, {
+      // Use unified API endpoint for Google authentication
+      const oauthRes = await fetchWithRetry(`${BACKEND_URL}/api/google-auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          credential, // Send the raw JWT for server-side verification
+          credential,
         }),
       });
 
@@ -142,8 +138,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
 
       const oauthData = await oauthRes.json();
       
-      // Backend should return a secure token (JWT or session ID)
-      const token = oauthData.token || oauthData.sessionToken;
+      const token = oauthData.token;
       
       if (!token) {
         throw new Error("Authentication failed: No token received from server");
@@ -152,11 +147,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       setGoogleAuthStep("Signing you in...");
       
       setAuthUser({
-        id: oauthData.seller.id,
-        name: oauthData.seller.name,
-        email: oauthData.seller.email,
-        token, // Use server-generated secure token
-        userType: "Seller",
+        id: oauthData.developer.id,
+        name: oauthData.developer.name,
+        email: oauthData.developer.email,
+        token,
+        role: oauthData.developer.role,
       });
 
       resetScanCount();
@@ -183,13 +178,13 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/register`, {
+      // Use unified API endpoint for signup
+      const registerRes = await fetchWithRetry(`${BACKEND_URL}/api/developer-auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phoneNumber: phoneNumber.trim(),
           password,
         }),
       });
@@ -202,8 +197,27 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         );
       }
 
-      setSuccessMessage("Verification code sent. Check your inbox.");
-      setMode("verify");
+      // Unified API doesn't require email verification, so login directly
+      const token = registerData.token;
+      
+      if (!token) {
+        throw new Error("Registration failed: No token received");
+      }
+
+      setAuthUser({
+        id: registerData.developer.id,
+        name: registerData.developer.name,
+        email: registerData.developer.email,
+        token,
+        role: registerData.developer.role,
+      });
+
+      resetScanCount();
+      setSuccessMessage("Account created successfully!");
+      
+      setTimeout(() => {
+        onSuccess();
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -211,46 +225,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     }
   }
 
+  // Verification mode removed since unified API doesn't use email verification
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const verifyRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          otp: otp.trim(),
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-
-      if (!verifyRes.ok) {
-        throw new Error(
-          verifyData.message || verifyData.error || "Verification failed"
-        );
-      }
-
-      const token = `vettcode_${verifyData.seller.id}_${Date.now()}`;
-
-      setAuthUser({
-        id: verifyData.seller.id,
-        name: verifyData.seller.name,
-        email: verifyData.seller.email,
-        token,
-        userType: "Seller",
-      });
-
-      resetScanCount();
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
-    } finally {
-      setLoading(false);
-    }
+    // Not used anymore - registration now logs in directly
+    setMode("login");
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -259,7 +238,8 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
-      const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/login`, {
+      // Use unified API endpoint for login
+      const loginRes = await fetchWithRetry(`${BACKEND_URL}/api/developer-auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -274,14 +254,18 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         throw new Error(loginData.message || loginData.error || "Login failed");
       }
 
-      const token = `vettcode_${loginData.seller.id}_${Date.now()}`;
+      const token = loginData.token;
+
+      if (!token) {
+        throw new Error("Login failed: No token received");
+      }
 
       setAuthUser({
-        id: loginData.seller.id,
-        name: loginData.seller.name,
-        email: loginData.seller.email,
+        id: loginData.developer.id,
+        name: loginData.developer.name,
+        email: loginData.developer.email,
         token,
-        userType: "Seller",
+        role: loginData.developer.role,
       });
 
       resetScanCount();
@@ -293,44 +277,22 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     }
   }
 
+  // Resend OTP removed since unified API doesn't use email verification
   async function handleResendOTP() {
-    setError(null);
-    setSuccessMessage(null);
-    setLoading(true);
-
-    try {
-      const resendRes = await fetchWithRetry(`${BACKEND_URL}/api/sellers/resend-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-
-      const resendData = await resendRes.json();
-
-      if (!resendRes.ok) {
-        throw new Error(
-          resendData.message || resendData.error || "Failed to resend code"
-        );
-      }
-
-      setSuccessMessage("A new code has been sent.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend code");
-    } finally {
-      setLoading(false);
-    }
+    // Not used anymore
+    setMode("login");
   }
 
   const titles = {
     login: "Sign in",
     register: "Create account",
-    verify: "Verify email",
+    verify: "Verify email", // Not used anymore
   };
 
   const subtitles = {
     login: "Access unlimited scans and saved preferences.",
     register: "Free account — no payment required.",
-    verify: `Enter the code sent to ${email || "your email"}.`,
+    verify: "Not used", // Not used anymore
   };
 
   return (
@@ -456,18 +418,6 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone">Phone</label>
-              <input
-                id="phone"
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
               <label htmlFor="reg-password">Password</label>
               <input
                 id="reg-password"
@@ -527,47 +477,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           </form>
         )}
 
-        {mode === "verify" && (
-          <form onSubmit={handleVerify} className="auth-form">
-            <div className="form-group">
-              <label htmlFor="otp">Verification code</label>
-              <input
-                id="otp"
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                required
-                disabled={loading}
-                maxLength={6}
-                style={{
-                  fontSize: "1.15rem",
-                  letterSpacing: "0.4rem",
-                  textAlign: "center",
-                }}
-              />
-            </div>
 
-            {error && <div className="error-message">{error}</div>}
-            {successMessage && (
-              <div className="success-message">{successMessage}</div>
-            )}
-
-            <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: "100%" }}>
-              {loading ? "Verifying…" : "Complete registration"}
-            </button>
-
-            <div className="auth-switch">
-              <button
-                type="button"
-                onClick={handleResendOTP}
-                className="link-button"
-                disabled={loading}
-              >
-                Resend code
-              </button>
-            </div>
-          </form>
-        )}
 
         <p className="auth-footer">
           Registration data is used for authentication and product analytics only.

@@ -289,6 +289,18 @@ export default function Home() {
         </a>
 
         <div className="header-actions">
+          <a 
+            href="https://vettcodecli.vercel.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="header-cli-link"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            CLI
+          </a>
           {user ? (
             <>
               <span className="user-pill">{user.name}</span>
@@ -346,6 +358,14 @@ export default function Home() {
                 <code>npm install -g vettcode-cli</code>
                 <code>vettcode .</code>
               </div>
+              <a 
+                href="https://vettcodecli.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="cli-learn-more"
+              >
+                Learn more about CLI →
+              </a>
             </div>
           </aside>
 

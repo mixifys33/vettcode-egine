@@ -1,50 +1,43 @@
 // Authentication utilities for VettCode Engine
-// Users are saved as "incomplete sellers" in the backend
+// Unified with VettCode CLI Landing Page authentication system
+
+import { API_CONFIG, getDeveloper, isAuthenticated as checkAuth, logout as apiLogout } from './api-config';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   token: string;
-  userType: 'Seller';
+  role?: string;
 }
 
-const AUTH_STORAGE_KEY = 'vettcode_auth';
 const SCAN_COUNT_KEY = 'vettcode_scan_count';
 const MAX_FREE_SCANS = 10;
 
 // Simple mutex for localStorage operations to prevent race conditions
 let scanCountMutex = Promise.resolve();
 
-// Get current authenticated user
+// Get current authenticated user (uses unified storage keys)
 export function getAuthUser(): AuthUser | null {
-  if (typeof window === 'undefined') return null;
-  
-  const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-  if (!stored) return null;
-  
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return null;
-  }
+  return getDeveloper();
 }
 
-// Save authenticated user
+// Save authenticated user (uses unified storage keys)
 export function setAuthUser(user: AuthUser): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, user.token);
+  localStorage.setItem(API_CONFIG.STORAGE_KEYS.DEVELOPER, JSON.stringify(user));
+  localStorage.setItem(API_CONFIG.STORAGE_KEYS.AUTHENTICATED, 'true');
 }
 
-// Clear authentication
+// Clear authentication (uses unified storage keys)
 export function clearAuth(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+  apiLogout();
 }
 
-// Check if user is authenticated
+// Check if user is authenticated (uses unified storage keys)
 export function isAuthenticated(): boolean {
-  return getAuthUser() !== null;
+  return checkAuth();
 }
 
 // Get current scan count for unauthenticated users
