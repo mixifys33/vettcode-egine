@@ -8,10 +8,10 @@ import path from "path";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const reportId = params.id;
+    const { id: reportId } = await params;
     
     if (!reportId || !reportId.startsWith("report_")) {
       return NextResponse.json(
