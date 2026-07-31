@@ -321,7 +321,15 @@ button {
   gap: 0.5rem;
 }
 
+.cli-command-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .cli-commands code {
+  flex: 1;
   display: inline-block;
   padding: 0.5rem 0.8rem;
   background: var(--surface);
@@ -331,13 +339,37 @@ button {
   font-size: 0.82rem;
   color: var(--accent);
   user-select: all;
-  cursor: pointer;
   transition: all 0.2s;
 }
 
 .cli-commands code:hover {
   background: var(--surface2);
   border-color: var(--primary);
+}
+
+.copy-button {
+  flex-shrink: 0;
+  padding: 0.5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-button:hover {
+  background: var(--surface3);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.copy-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .cli-learn-more {

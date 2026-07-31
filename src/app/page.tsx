@@ -75,6 +75,7 @@ export default function Home() {
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -267,6 +268,15 @@ export default function Home() {
     setError(null);
   }
 
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedCommand(text);
+      setTimeout(() => setCopiedCommand(null), 2000);
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+    });
+  }
+
   const scanQuota = canScan();
 
   return (
@@ -299,7 +309,7 @@ export default function Home() {
               <polyline points="4 17 10 11 4 5" />
               <line x1="12" y1="19" x2="20" y2="19" />
             </svg>
-            CLI
+           Vettcode CLI
           </a>
           {user ? (
             <>
@@ -355,8 +365,44 @@ export default function Home() {
               <strong>Also available as CLI</strong>
               <p>Run VettCode directly in your terminal for CI/CD integration</p>
               <div className="cli-commands">
-                <code>npm install -g vettcode-cli</code>
-                <code>vettcode .</code>
+                <div className="cli-command-wrapper">
+                  <code>npm install -g vettcode-cli</code>
+                  <button
+                    className="copy-button"
+                    onClick={() => copyToClipboard('npm install -g vettcode-cli')}
+                    title="Copy to clipboard"
+                  >
+                    {copiedCommand === 'npm install -g vettcode-cli' ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <div className="cli-command-wrapper">
+                  <code>vettcode .</code>
+                  <button
+                    className="copy-button"
+                    onClick={() => copyToClipboard('vettcode .')}
+                    title="Copy to clipboard"
+                  >
+                    {copiedCommand === 'vettcode .' ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <a 
                 href="https://vettcodecli.vercel.app/" 
@@ -364,7 +410,7 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className="cli-learn-more"
               >
-                Learn more about CLI →
+                Learn more about Vettcode CLI →
               </a>
             </div>
           </aside>
