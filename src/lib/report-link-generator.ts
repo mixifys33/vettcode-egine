@@ -4,6 +4,7 @@
  */
 
 import type { VettReport } from "./types";
+import { encode } from "js-base64";
 
 const LANDING_PAGE_URL = process.env.NEXT_PUBLIC_LANDING_URL || "https://vettcodecli.vercel.app";
 
@@ -37,12 +38,12 @@ export function generateReportViewLink(report: VettReport, projectName: string):
       },
     };
 
-    // Convert to JSON and encode as base64
+    // Convert to JSON and encode as base64 (Unicode-safe)
     const jsonData = JSON.stringify(cleanReport);
-    const base64Data = btoa(jsonData);
+    const base64Data = encode(jsonData, true); // true = URL-safe encoding
 
     // Generate the URL with encoded data
-    const url = `${LANDING_PAGE_URL}/reports/view?data=${encodeURIComponent(base64Data)}`;
+    const url = `${LANDING_PAGE_URL}/reports/view?data=${base64Data}`;
 
     return url;
   } catch (error) {
