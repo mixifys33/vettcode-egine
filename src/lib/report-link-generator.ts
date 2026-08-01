@@ -34,7 +34,6 @@ export function generateReportViewLink(report: VettReport, projectName: string):
         staticFindings: report.metadata?.staticFindings,
         aiFindings: report.metadata?.aiFindings,
         verifiedFindings: report.metadata?.verifiedFindings,
-        scanMode: "quick", // Default to quick scan
       },
     };
 
@@ -102,7 +101,6 @@ export function generateCompactReportLink(report: VettReport, projectName: strin
       staticFindings: report.metadata?.staticFindings,
       aiFindings: report.metadata?.aiFindings,
       verifiedFindings: report.metadata?.verifiedFindings,
-      scanMode: "quick",
     },
   };
 
