@@ -7,6 +7,7 @@ import { PreListModal, type PreListFormData } from "./PreListModal";
 import { AutoPreListSettings } from "./AutoPreListSettings";
 import { AuthModal } from "./AuthModal";
 import { getAuthUser, clearAuth } from "@/lib/auth";
+import { openReportInNewTab, copyReportLinkToClipboard } from "@/lib/report-link-generator";
 import {
   TrendingUp,
   ShieldCheck,
@@ -23,6 +24,8 @@ import {
   ShieldAlert,
   Wrench,
   FileCheck,
+  ExternalLink,
+  Share2,
 } from "lucide-react";
 import DOMPurify from "dompurify";
 
@@ -1779,12 +1782,52 @@ export function ReportView({
           flexWrap: "wrap",
         }}
       >
+        <button 
+          type="button" 
+          className="btn btn-primary"
+          onClick={() => {
+            const projectName = report.metadata?.projectName || "Unnamed Project";
+            openReportInNewTab(report, projectName);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <ExternalLink size={18} />
+          Open CLI Report Viewer
+        </button>
+        
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={async () => {
+            const projectName = report.metadata?.projectName || "Unnamed Project";
+            const success = await copyReportLinkToClipboard(report, projectName);
+            if (success) {
+              alert("✓ Report link copied to clipboard! Share it with your team.");
+            } else {
+              alert("Failed to copy link. Please try again.");
+            }
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <Share2 size={18} />
+          Copy Share Link
+        </button>
+        
         <button type="button" className="btn btn-ghost" onClick={onReset}>
           Scan another project
         </button>
+        
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-ghost"
           onClick={() => {
             const blob = new Blob([JSON.stringify(report, null, 2)], {
               type: "application/json",
