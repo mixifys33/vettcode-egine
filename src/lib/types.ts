@@ -48,6 +48,7 @@ export interface VettReport {
     filesScanned: number;
     linesScanned: number;
     ignoredPaths: number;
+    scanMode?: "quick" | "deep";
     reportConfidence?: number;
     reportConfidenceGrade?: string;
     reportConfidenceExplanation?: string;
