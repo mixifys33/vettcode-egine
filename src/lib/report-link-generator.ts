@@ -81,7 +81,6 @@ export function generateCompactReportLink(report: VettReport, projectName: strin
     metadata: {
       ...report.metadata,
       projectName,
-      note: "This is a compact view showing top 50 findings. Save locally for full report.",
     },
   };
 
