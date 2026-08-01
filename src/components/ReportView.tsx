@@ -1803,12 +1803,24 @@ export function ReportView({
           type="button"
           className="btn btn-secondary"
           onClick={async () => {
-            const projectName = report.metadata?.projectName || "Unnamed Project";
-            const success = await copyReportLinkToClipboard(report, projectName);
-            if (success) {
-              alert("✓ Report link copied to clipboard! Share it with your team.");
-            } else {
-              alert("Failed to copy link. Please try again.");
+            try {
+              const projectName = report.metadata?.projectName || "Unnamed Project";
+              console.log("Starting copy operation...");
+              const success = await copyReportLinkToClipboard(report, projectName);
+              if (success) {
+                // Show a message about saving locally for full report
+                const fullReportSize = JSON.stringify(report).length;
+                if (fullReportSize > 50000) {
+                  alert("✓ Shareable link copied!\n\nNote: Due to the report's size, the link contains a summary. For the full report, use the 'Save Report' feature on the landing page.");
+                } else {
+                  alert("✓ Report link copied to clipboard! Share it with your team.");
+                }
+              } else {
+                alert("❌ Failed to copy link. This might be due to:\n\n• Browser clipboard permissions\n• Report data too large\n\nTry:\n1. Allow clipboard access when prompted\n2. Use 'Open CLI Report Viewer' button instead\n3. Use Export JSON to save locally");
+              }
+            } catch (error) {
+              console.error("Copy button error:", error);
+              alert("❌ Failed to copy link. Please try the 'Open CLI Report Viewer' button instead.");
             }
           }}
           style={{
