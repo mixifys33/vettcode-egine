@@ -79,8 +79,26 @@ export function generateCompactReportLink(report: VettReport, projectName: strin
       })
       .slice(0, 50), // Keep top 50 findings
     metadata: {
-      ...report.metadata,
       projectName,
+      scannedAt: report.metadata?.scannedAt || new Date().toISOString(),
+      filesScanned: report.metadata?.filesScanned || report.scannedFiles || 0,
+      linesScanned: report.metadata?.linesScanned || report.scannedLines || 0,
+      ignoredPaths: report.metadata?.ignoredPaths || report.ignoredPaths || 0,
+      reportConfidence: report.metadata?.reportConfidence,
+      reportConfidenceGrade: report.metadata?.reportConfidenceGrade,
+      reportConfidenceExplanation: report.metadata?.reportConfidenceExplanation,
+      fileTree: report.metadata?.fileTree,
+      staticFindings: report.metadata?.staticFindings,
+      aiFindings: report.metadata?.aiFindings,
+      verifiedFindings: report.metadata?.verifiedFindings,
+      scannerFindings: report.metadata?.scannerFindings,
+      staticOnlyScore: report.metadata?.staticOnlyScore,
+      fullScore: report.metadata?.fullScore,
+      displayedScore: report.metadata?.displayedScore,
+      originalScore: report.metadata?.originalScore,
+      scoreSource: report.metadata?.scoreSource,
+      scoreExplanation: report.metadata?.scoreExplanation,
+      scannerResults: report.metadata?.scannerResults,
     },
   };
 
